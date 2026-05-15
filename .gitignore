@@ -1,0 +1,114 @@
+# =========================================================
+# Python
+# =========================================================
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Python packaging
+build/
+dist/
+*.egg-info/
+.eggs/
+pip-wheel-metadata/
+
+# Test / coverage
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+.cache/
+
+# =========================================================
+# Jupyter / exploratory work
+# =========================================================
+.ipynb_checkpoints/
+notebooks/
+
+# =========================================================
+# Environment / secrets
+# =========================================================
+.env
+.env.*
+!.env.example
+
+# =========================================================
+# IDE / editor
+# =========================================================
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# =========================================================
+# OS files
+# =========================================================
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# =========================================================
+# Project data outputs
+# =========================================================
+
+# Raw downloaded or manually added data
+data/raw/
+
+# Processed/generated datasets
+data/processed/
+
+# Generated charts, tables, and reports
+outputs/charts/
+outputs/tables/
+outputs/reports/
+
+# Optional alternate report folders
+reports/
+reports/figures/
+
+# =========================================================
+# Generated report files
+# =========================================================
+*.docx
+*.pdf
+
+# Keep final portfolio/report PDFs if intentionally placed in docs/
+!docs/
+!docs/*.pdf
+!docs/*.md
+
+# =========================================================
+# Logs
+# =========================================================
+*.log
+logs/
+
+# =========================================================
+# Local scratch files
+# =========================================================
+scratch/
+tmp/
+temp/
+
+# =========================================================
+# Streamlit
+# =========================================================
+.streamlit/secrets.toml
+
+# =========================================================
+# Keep folder structure
+# =========================================================
+!data/
+!data/raw/.gitkeep
+!data/processed/.gitkeep
+!outputs/
+!outputs/charts/.gitkeep
+!outputs/tables/.gitkeep
+!outputs/reports/.gitkeep
