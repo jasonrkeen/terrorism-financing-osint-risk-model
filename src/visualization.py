@@ -8,8 +8,10 @@ Some expanded-project charts are created by supplemental modules:
 - src.conflict_data_supplement creates the conflict fatalities chart.
 - src.additional_risk_factors creates regional and current FATF comparison charts.
 
-This module creates the core model charts and verifies whether the supplemental
-chart outputs are present.
+This module creates the core model charts, the threat-finance intelligence
+priority charts, the ACLED recent conflict-signal chart, the organized-crime
+vulnerability chart, the GDELT 2.0 batch public-news signal chart, and verifies
+whether supplemental chart outputs are present.
 """
 
 from __future__ import annotations
@@ -32,6 +34,15 @@ from src.config import (
     REGIONAL_AVERAGE_RISK_CHART_FILE,
     REGIONAL_FATF_COUNT_CHART_FILE,
     CURRENT_FATF_STATUS_COMPARISON_CHART_FILE,
+    TOP_15_COLLECTION_PRIORITY_CHART_FILE,
+    INTELLIGENCE_GAP_DISTRIBUTION_CHART_FILE,
+    ACLED_SIGNAL_TOP_15_CHART_FILE,
+    THREAT_FINANCE_COLLECTION_PRIORITIES_FILE,
+    ACLED_SIGNAL_ENRICHMENT_FILE,
+    ORGANIZED_CRIME_ENRICHMENT_FILE,
+    TOP_15_ORGANIZED_CRIME_CHART_FILE,
+    GDELT_NEWS_SIGNAL_ENRICHMENT_FILE,
+    TOP_15_GDELT_NEWS_SIGNAL_CHART_FILE,
     CHARTS_DIR,
     TABLES_DIR,
     SCALED_RISK_FEATURES,
@@ -71,6 +82,26 @@ def load_rankings() -> pd.DataFrame:
 
     print("Risk rankings loaded.")
     print(f"Shape: {df.shape}")
+
+    return df
+
+
+def read_optional_csv(path) -> pd.DataFrame | None:
+    """
+    Read an optional CSV output if it exists and is readable.
+    """
+
+    if not path.exists():
+        return None
+
+    try:
+        df = pd.read_csv(path)
+    except Exception as error:
+        print(f"Could not read optional CSV {path}: {error}")
+        return None
+
+    if df.empty:
+        return None
 
     return df
 
@@ -334,6 +365,278 @@ def save_sensitivity_overlap_chart() -> None:
 
 
 # ---------------------------------------------------
+# Threat finance intelligence, ACLED, organized-crime, and GDELT 2.0 batch charts
+# ---------------------------------------------------
+
+def save_top_15_collection_priority_chart() -> None:
+    """
+    Save a horizontal bar chart of the top 15 collection-priority scores.
+    """
+
+    priority_df = read_optional_csv(THREAT_FINANCE_COLLECTION_PRIORITIES_FILE)
+
+    if priority_df is None:
+        print("Threat finance collection-priority file not found. Skipping chart.")
+        return
+
+    required_columns = ["country", "collection_priority_score"]
+
+    missing_columns = [
+        column for column in required_columns if column not in priority_df.columns
+    ]
+
+    if missing_columns:
+        print(
+            "Collection-priority file is missing required columns. "
+            f"Skipping chart: {missing_columns}"
+        )
+        return
+
+    chart_df = (
+        priority_df.copy()
+        .assign(
+            collection_priority_score=pd.to_numeric(
+                priority_df["collection_priority_score"],
+                errors="coerce",
+            )
+        )
+        .dropna(subset=["collection_priority_score"])
+        .sort_values("collection_priority_score", ascending=False)
+        .head(15)
+    )
+
+    if chart_df.empty:
+        print("No collection-priority records available for charting.")
+        return
+
+    plt.figure(figsize=(12, 7))
+    plt.barh(chart_df["country"], chart_df["collection_priority_score"])
+    plt.gca().invert_yaxis()
+    plt.title("Top 15 Threat Finance Collection Priorities")
+    plt.xlabel("Collection Priority Score, 0-100")
+    plt.ylabel("Country")
+    plt.tight_layout()
+    plt.savefig(TOP_15_COLLECTION_PRIORITY_CHART_FILE, dpi=300)
+    plt.close()
+
+    print("Saved chart:")
+    print(TOP_15_COLLECTION_PRIORITY_CHART_FILE)
+
+
+def save_intelligence_gap_distribution_chart() -> None:
+    """
+    Save a histogram of intelligence-gap scores.
+    """
+
+    priority_df = read_optional_csv(THREAT_FINANCE_COLLECTION_PRIORITIES_FILE)
+
+    if priority_df is None:
+        print("Threat finance collection-priority file not found. Skipping chart.")
+        return
+
+    if "intelligence_gap_score" not in priority_df.columns:
+        print(
+            "Collection-priority file is missing intelligence_gap_score. "
+            "Skipping intelligence-gap distribution chart."
+        )
+        return
+
+    scores = pd.to_numeric(
+        priority_df["intelligence_gap_score"],
+        errors="coerce",
+    ).dropna()
+
+    if scores.empty:
+        print("No intelligence-gap scores available for charting.")
+        return
+
+    plt.figure(figsize=(9, 6))
+    plt.hist(scores, bins=12)
+    plt.title("Distribution of Threat Finance Intelligence Gap Scores")
+    plt.xlabel("Intelligence Gap Score, 0-100")
+    plt.ylabel("Number of Countries")
+    plt.tight_layout()
+    plt.savefig(INTELLIGENCE_GAP_DISTRIBUTION_CHART_FILE, dpi=300)
+    plt.close()
+
+    print("Saved chart:")
+    print(INTELLIGENCE_GAP_DISTRIBUTION_CHART_FILE)
+
+
+def save_top_15_acled_signal_chart() -> None:
+    """
+    Save a horizontal bar chart of top 15 ACLED recent conflict-signal scores.
+    """
+
+    acled_df = read_optional_csv(ACLED_SIGNAL_ENRICHMENT_FILE)
+
+    if acled_df is None:
+        print("ACLED signal enrichment file not found. Skipping ACLED chart.")
+        return
+
+    required_columns = ["country", "acled_conflict_signal_score"]
+
+    missing_columns = [
+        column for column in required_columns if column not in acled_df.columns
+    ]
+
+    if missing_columns:
+        print(
+            "ACLED signal file is missing required columns. "
+            f"Skipping ACLED chart: {missing_columns}"
+        )
+        return
+
+    chart_df = (
+        acled_df.copy()
+        .assign(
+            acled_conflict_signal_score=pd.to_numeric(
+                acled_df["acled_conflict_signal_score"],
+                errors="coerce",
+            )
+        )
+        .dropna(subset=["acled_conflict_signal_score"])
+        .sort_values("acled_conflict_signal_score", ascending=False)
+        .head(15)
+    )
+
+    if chart_df.empty:
+        print("No ACLED signal records available for charting.")
+        return
+
+    plt.figure(figsize=(12, 7))
+    plt.barh(chart_df["country"], chart_df["acled_conflict_signal_score"])
+    plt.gca().invert_yaxis()
+    plt.title("Top 15 ACLED Recent Conflict and Unrest Signals")
+    plt.xlabel("ACLED Conflict Signal Score, 0-100")
+    plt.ylabel("Country / Territory")
+    plt.tight_layout()
+    plt.savefig(ACLED_SIGNAL_TOP_15_CHART_FILE, dpi=300)
+    plt.close()
+
+    print("Saved chart:")
+    print(ACLED_SIGNAL_TOP_15_CHART_FILE)
+
+
+def save_top_15_organized_crime_chart() -> None:
+    """
+    Save a horizontal bar chart of top 15 organized-crime vulnerability scores.
+    """
+
+    organized_crime_df = read_optional_csv(ORGANIZED_CRIME_ENRICHMENT_FILE)
+
+    if organized_crime_df is None:
+        print(
+            "Organized-crime enrichment file not found. "
+            "Skipping organized-crime chart."
+        )
+        return
+
+    required_columns = ["country", "organized_crime_score"]
+
+    missing_columns = [
+        column
+        for column in required_columns
+        if column not in organized_crime_df.columns
+    ]
+
+    if missing_columns:
+        print(
+            "Organized-crime enrichment file is missing required columns. "
+            f"Skipping organized-crime chart: {missing_columns}"
+        )
+        return
+
+    chart_df = (
+        organized_crime_df.copy()
+        .assign(
+            organized_crime_score=pd.to_numeric(
+                organized_crime_df["organized_crime_score"],
+                errors="coerce",
+            )
+        )
+        .dropna(subset=["organized_crime_score"])
+        .sort_values("organized_crime_score", ascending=False)
+        .head(15)
+    )
+
+    if chart_df.empty:
+        print("No organized-crime score records available for charting.")
+        return
+
+    plt.figure(figsize=(12, 7))
+    plt.barh(chart_df["country"], chart_df["organized_crime_score"])
+    plt.gca().invert_yaxis()
+    plt.title("Top 15 Organized Crime Vulnerability Scores")
+    plt.xlabel("Organized Crime Vulnerability Score, 0-100")
+    plt.ylabel("Country")
+    plt.tight_layout()
+    plt.savefig(TOP_15_ORGANIZED_CRIME_CHART_FILE, dpi=300)
+    plt.close()
+
+    print("Saved chart:")
+    print(TOP_15_ORGANIZED_CRIME_CHART_FILE)
+
+
+def save_top_15_gdelt_news_signal_chart() -> None:
+    """
+    Save a horizontal bar chart of top 15 GDELT 2.0 batch public-news signal scores.
+    """
+
+    gdelt_df = read_optional_csv(GDELT_NEWS_SIGNAL_ENRICHMENT_FILE)
+
+    if gdelt_df is None:
+        print(
+            "GDELT 2.0 batch news signal enrichment file not found. "
+            "Skipping GDELT chart."
+        )
+        return
+
+    required_columns = ["country", "gdelt_news_signal_score"]
+
+    missing_columns = [
+        column for column in required_columns if column not in gdelt_df.columns
+    ]
+
+    if missing_columns:
+        print(
+            "GDELT 2.0 batch news signal file is missing required columns. "
+            f"Skipping GDELT chart: {missing_columns}"
+        )
+        return
+
+    chart_df = (
+        gdelt_df.copy()
+        .assign(
+            gdelt_news_signal_score=pd.to_numeric(
+                gdelt_df["gdelt_news_signal_score"],
+                errors="coerce",
+            )
+        )
+        .dropna(subset=["gdelt_news_signal_score"])
+        .sort_values("gdelt_news_signal_score", ascending=False)
+        .head(15)
+    )
+
+    if chart_df.empty:
+        print("No GDELT 2.0 batch news signal records available for charting.")
+        return
+
+    plt.figure(figsize=(12, 7))
+    plt.barh(chart_df["country"], chart_df["gdelt_news_signal_score"])
+    plt.gca().invert_yaxis()
+    plt.title("Top 15 GDELT 2.0 Batch Public-News Signal Scores")
+    plt.xlabel("GDELT 2.0 Batch Public-News Signal Score, 0-100")
+    plt.ylabel("Country")
+    plt.tight_layout()
+    plt.savefig(TOP_15_GDELT_NEWS_SIGNAL_CHART_FILE, dpi=300)
+    plt.close()
+
+    print("Saved chart:")
+    print(TOP_15_GDELT_NEWS_SIGNAL_CHART_FILE)
+
+
+# ---------------------------------------------------
 # Correlation output
 # ---------------------------------------------------
 
@@ -401,6 +704,26 @@ def verify_supplemental_charts() -> None:
             CURRENT_FATF_STATUS_COMPARISON_CHART_FILE,
             "Current FATF status comparison chart",
         ),
+        (
+            TOP_15_COLLECTION_PRIORITY_CHART_FILE,
+            "Top 15 collection-priority chart",
+        ),
+        (
+            INTELLIGENCE_GAP_DISTRIBUTION_CHART_FILE,
+            "Intelligence-gap distribution chart",
+        ),
+        (
+            ACLED_SIGNAL_TOP_15_CHART_FILE,
+            "Top 15 ACLED recent signal chart",
+        ),
+        (
+            TOP_15_ORGANIZED_CRIME_CHART_FILE,
+            "Top 15 organized-crime vulnerability chart",
+        ),
+        (
+            TOP_15_GDELT_NEWS_SIGNAL_CHART_FILE,
+            "Top 15 GDELT 2.0 batch public-news signal chart",
+        ),
     ]
 
     print("\nSupplemental chart check:")
@@ -437,6 +760,11 @@ def validate_visualization_outputs() -> None:
     optional_outputs = [
         RISK_TIER_DISTRIBUTION_CHART_FILE,
         SENSITIVITY_OVERLAP_CHART_FILE,
+        TOP_15_COLLECTION_PRIORITY_CHART_FILE,
+        INTELLIGENCE_GAP_DISTRIBUTION_CHART_FILE,
+        ACLED_SIGNAL_TOP_15_CHART_FILE,
+        TOP_15_ORGANIZED_CRIME_CHART_FILE,
+        TOP_15_GDELT_NEWS_SIGNAL_CHART_FILE,
     ]
 
     missing_required = [
@@ -460,11 +788,12 @@ def validate_visualization_outputs() -> None:
         for output_path in missing_optional:
             print(output_path)
         print(
-            "This usually means enhanced_analysis.py has not been run yet. "
-            "Run src.enhanced_analysis or the full main.py pipeline to create them."
+            "Some optional charts depend on enhanced_analysis.py, "
+            "threat_finance_intelligence.py, acled_enrichment.py, organized_crime_enrichment.py, or gdelt_batch_enrichment.py. "
+            "Run the full main.py pipeline to create them."
         )
     else:
-        print("Optional enhanced-analysis chart outputs are present.")
+        print("Optional enhanced-analysis, intelligence, ACLED, organized-crime, and GDELT 2.0 batch chart outputs are present.")
 
 
 # ---------------------------------------------------
@@ -490,6 +819,11 @@ def main() -> None:
     save_top_20_probability_chart(df)
     save_risk_tier_distribution_chart()
     save_sensitivity_overlap_chart()
+    save_top_15_collection_priority_chart()
+    save_intelligence_gap_distribution_chart()
+    save_top_15_acled_signal_chart()
+    save_top_15_organized_crime_chart()
+    save_top_15_gdelt_news_signal_chart()
     save_correlation_matrix(df)
     verify_supplemental_charts()
     validate_visualization_outputs()

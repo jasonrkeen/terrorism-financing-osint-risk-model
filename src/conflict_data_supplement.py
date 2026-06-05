@@ -4,9 +4,13 @@ Conflict data supplement for the terrorism financing OSINT risk model.
 This module adds a supplemental conflict-exposure layer using the UCDP
 Country-Year Dataset on Organized Violence within Country Borders.
 
+UCDP is used as the structured annual conflict-exposure layer. ACLED is handled
+separately in src/acled_data_collection.py and src/acled_enrichment.py as the
+recent conflict, unrest, and political-violence signal layer.
+
 The conflict supplement does not replace the main terrorism-financing
 vulnerability score. It creates additional context tables and a chart that can
-be used in future report versions.
+be used in report, dashboard, and intelligence-prioritization workflows.
 """
 
 from __future__ import annotations

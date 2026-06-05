@@ -7,3 +7,5 @@ scikit-learn
 python-docx
 docx2pdf
 streamlit
+python-dotenv
+openpyxl

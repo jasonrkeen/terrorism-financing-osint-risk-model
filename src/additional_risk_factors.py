@@ -111,6 +111,13 @@ CURRENT_FATF_STATUS_COMPARISON_CHART_FILE = getattr(
 )
 
 
+ACLED_SIGNAL_ENRICHMENT_FILE = getattr(
+    config,
+    "ACLED_SIGNAL_ENRICHMENT_FILE",
+    TABLES_DIR / "acled_signal_enrichment.csv",
+)
+
+
 # ---------------------------------------------------
 # Loading helpers
 # ---------------------------------------------------
@@ -819,6 +826,25 @@ def count_populated_rows(df: pd.DataFrame, value_columns: List[str]) -> int:
     return int(temp.notna().any(axis=1).sum())
 
 
+def count_acled_signal_records() -> int:
+    """
+    Count ACLED country-level signal records if the ACLED enrichment output exists.
+    """
+
+    if not ACLED_SIGNAL_ENRICHMENT_FILE.exists():
+        return 0
+
+    try:
+        acled_df = pd.read_csv(ACLED_SIGNAL_ENRICHMENT_FILE)
+    except Exception:
+        return 0
+
+    if acled_df.empty:
+        return 0
+
+    return len(acled_df)
+
+
 def save_additional_factor_summary(
     regional_summary_df: pd.DataFrame,
     sanctions_supplement_df: pd.DataFrame,
@@ -872,6 +898,12 @@ def save_additional_factor_summary(
                 if "countries_with_conflict_exposure" in regional_summary_df.columns
                 else 0,
                 "output_file": str(REGIONAL_RISK_SUMMARY_FILE),
+            },
+            {
+                "factor": "ACLED recent conflict and unrest signal",
+                "status": "Created if ACLED signal enrichment output exists",
+                "records_or_groups": count_acled_signal_records(),
+                "output_file": str(ACLED_SIGNAL_ENRICHMENT_FILE),
             },
             {
                 "factor": "Sanctions exposure indicators",

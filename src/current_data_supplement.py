@@ -51,32 +51,65 @@ def build_world_bank_url(indicator_code: str) -> str:
     )
 
 
-def request_world_bank_data(url: str) -> list:
+def request_world_bank_data(
+    url: str,
+    max_retries: int = 3,
+    timeout: int = 90,
+) -> list:
     """
     Request data from the World Bank API and return the JSON response.
+
+    The World Bank API can occasionally be slow or temporarily unavailable.
+    This helper uses a longer timeout and retry logic so the full pipeline
+    does not fail on a single slow request.
     """
 
-    try:
-        response = requests.get(url, timeout=30)
-        response.raise_for_status()
-    except requests.exceptions.RequestException as error:
-        raise RuntimeError(
-            f"World Bank API request failed for URL: {url}"
-        ) from error
+    import time
 
-    try:
-        json_data = response.json()
-    except ValueError as error:
-        raise RuntimeError(
-            f"World Bank API response was not valid JSON for URL: {url}"
-        ) from error
+    last_error = None
 
-    if not isinstance(json_data, list):
-        raise RuntimeError(
-            f"World Bank API response had an unexpected format for URL: {url}"
-        )
+    for attempt in range(1, max_retries + 1):
+        try:
+            print(f"World Bank request attempt {attempt}/{max_retries}")
 
-    return json_data
+            response = requests.get(url, timeout=timeout)
+            response.raise_for_status()
+
+            try:
+                json_data = response.json()
+            except ValueError as error:
+                raise RuntimeError(
+                    f"World Bank API response was not valid JSON for URL: {url}"
+                ) from error
+
+            if not isinstance(json_data, list):
+                raise RuntimeError(
+                    f"World Bank API response had an unexpected format for URL: {url}"
+                )
+
+            return json_data
+
+        except requests.exceptions.RequestException as error:
+            last_error = error
+            print(f"World Bank request failed on attempt {attempt}: {error}")
+
+            if attempt < max_retries:
+                sleep_seconds = 5 * attempt
+                print(f"Retrying in {sleep_seconds} seconds...")
+                time.sleep(sleep_seconds)
+
+        except RuntimeError as error:
+            last_error = error
+            print(f"World Bank response validation failed on attempt {attempt}: {error}")
+
+            if attempt < max_retries:
+                sleep_seconds = 5 * attempt
+                print(f"Retrying in {sleep_seconds} seconds...")
+                time.sleep(sleep_seconds)
+
+    raise RuntimeError(
+        f"World Bank API request failed after {max_retries} attempts for URL: {url}"
+    ) from last_error
 
 
 # ---------------------------------------------------

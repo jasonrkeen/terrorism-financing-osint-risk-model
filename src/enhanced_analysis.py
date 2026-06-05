@@ -9,8 +9,9 @@ This script expands the core model analysis by adding:
 
 The outputs are saved to outputs/tables/.
 
-Conflict, sanctions, FATF mutual evaluation, and regional outputs are handled
-as supplemental analytical layers in separate modules.
+UCDP conflict, ACLED recent-event signals, sanctions, FATF mutual evaluation,
+and regional outputs are handled as supplemental analytical layers in separate
+modules.
 """
 
 from __future__ import annotations

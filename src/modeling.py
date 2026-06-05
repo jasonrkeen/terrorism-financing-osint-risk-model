@@ -13,9 +13,9 @@ The model uses the core vulnerability indicators only:
 - inflation risk
 - unemployment risk
 
-Conflict, sanctions, FATF mutual evaluation, and regional outputs are treated
-as supplemental analytical layers in separate modules. They are not used as
-predictors in this core model.
+UCDP conflict, ACLED recent-event signals, sanctions, FATF mutual evaluation,
+and regional outputs are treated as supplemental analytical layers in separate
+modules. They are not used as predictors in this core model.
 """
 
 from __future__ import annotations

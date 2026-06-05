@@ -5,9 +5,9 @@ This script cleans the raw World Bank dataset, removes incomplete records,
 creates the FATF grey-list target variable, preserves indicator year fields,
 and creates risk-oriented features.
 
-The processed dataset supports the core vulnerability score. Conflict,
-regional, sanctions, and FATF mutual evaluation outputs are handled later
-as supplemental analytical layers.
+The processed dataset supports the core vulnerability score. UCDP conflict,
+ACLED recent-event signals, regional, sanctions, and FATF mutual evaluation
+outputs are handled later as supplemental analytical layers.
 """
 
 import numpy as np

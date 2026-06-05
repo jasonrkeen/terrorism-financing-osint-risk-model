@@ -12,9 +12,9 @@ The score is based on the core model indicators only:
 - inflation stress
 - unemployment stress
 
-Conflict, sanctions, FATF mutual evaluation, and regional outputs are treated
-as supplemental analytical layers in separate modules. They do not replace the
-main vulnerability score.
+UCDP conflict, ACLED recent-event signals, sanctions, FATF mutual evaluation,
+and regional outputs are treated as supplemental analytical layers in separate
+modules. They do not replace the main vulnerability score.
 """
 
 from __future__ import annotations

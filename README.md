@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-This project builds a defensive open-source intelligence (OSINT) model for assessing **country-level terrorism financing vulnerability**. The model uses public governance and economic indicators to create a transparent country-level risk score, compares that score against FATF grey-list status, and adds supplemental context from conflict data, current FATF monitoring status, regional summaries, sanctions templates, FATF mutual-evaluation templates, official AML/CFT policy sources, virtual-assets context, and an interactive Streamlit dashboard.
+This project builds a defensive open-source intelligence (OSINT) model for assessing **country-level terrorism financing vulnerability**. The model uses public governance and economic indicators to create a transparent country-level risk score, compares that score against FATF grey-list status, and adds supplemental context from UCDP conflict data, ACLED recent conflict and unrest signals, the Global Organized Crime Index, GDELT 2.0 batch public-news signals, current FATF monitoring status, regional summaries, sanctions templates, FATF mutual-evaluation templates, official AML/CFT policy sources, virtual-assets context, a threat finance intelligence-gap layer, and an interactive Streamlit dashboard.
 
 The project is intended for academic research, defensive intelligence analysis, financial-crime risk screening, AML/CFT model documentation, country-risk prioritization, and portfolio/project demonstration.
 
@@ -29,8 +29,12 @@ The model:
 - Does not replace suspicious activity reporting, law enforcement investigations, or institutional AML/CFT risk assessments
 - Does not substitute for FATF mutual evaluation reports, national risk assessments, or regulated-sector compliance obligations
 - Does not provide legal, compliance, investigative, or law-enforcement conclusions
+- Does not identify terrorists, terrorist organizations, illicit financial networks, or sanctions targets
+- Does not treat conflict, unrest, organized-crime, or sanctions indicators as proof of terrorism-financing activity
 
 The risk score should be interpreted as a **structural vulnerability indicator**, not evidence of terrorism financing activity.
+
+The intelligence-gap and collection-priority outputs should be interpreted as **public-source review aids**, not determinations of criminality, terrorism, sanctions exposure, or illicit activity.
 
 ---
 
@@ -48,7 +52,7 @@ When exact 2024 data is unavailable for a country or indicator, the pipeline use
 
 The model does **not** use 2025 or 2026 as the primary model year because the core World Bank governance and economic indicator panel is not consistently available as a complete comparable country-year dataset for those years.
 
-More recent 2025 and 2026 official sources may be used as **context**, but not as replacement model-year observations.
+More recent 2025 and 2026 official sources, current FATF context, ACLED recent-event signals, Global Organized Crime Index data, and GDELT 2.0 batch public-news signals may be used as **supplemental context**, but not as replacement model-year observations.
 
 ---
 
@@ -70,7 +74,7 @@ This distinction matters because:
 
 ## Model Inputs and Analytical Role
 
-The model separates inputs into three categories:
+The model separates inputs into four categories:
 
 1. **Core quantitative inputs** used directly in the baseline score:
    - Governance indicators
@@ -83,7 +87,10 @@ The model separates inputs into three categories:
    - FATF grey-list status
 
 3. **Supplemental interpretation layers**:
-   - UCDP conflict exposure
+   - UCDP annual conflict exposure
+   - ACLED recent conflict, unrest, and political-violence signals
+   - Global Organized Crime Index criminality and resilience context
+   - GDELT 2.0 batch public-news signal context
    - Risk tiers
    - Top risk drivers
    - Current FATF monitoring comparison
@@ -92,6 +99,15 @@ The model separates inputs into three categories:
    - FATF mutual-evaluation templates
    - Official AML/CFT policy context
    - Virtual-assets and Travel Rule context
+
+4. **Threat finance intelligence layer**:
+   - Intelligence gap score
+   - Source coverage score
+   - Source staleness score
+   - Live/recent signal score
+   - Collection-priority score
+   - Recommended public-source collection focus
+   - Conservative analyst-review note
 
 This separation keeps the baseline score transparent and reproducible. Supplemental layers improve interpretation but do not change the baseline score unless explicitly added in a future model version.
 
@@ -110,7 +126,10 @@ The core model uses:
 | World Bank WDI | Inflation | `inflation` | Macroeconomic stress |
 | World Bank WDI | Unemployment | `unemployment` | Labor-market stress |
 | FATF | Grey-list status | `fatf_grey_list` | Validation/comparison target |
-| UCDP | Organized violence country-year data | `conflict_deaths_total` | Supplemental conflict exposure |
+| UCDP | Organized violence country-year data | `conflict_deaths_total` | Supplemental annual conflict exposure |
+| ACLED | Recent conflict, unrest, and political-violence events | `acled_conflict_signal_score` | Recent-event live-signal enrichment |
+| Global Organized Crime Index | Criminality and resilience scores | `organized_crime_score` | Supplemental organized-crime convergence context |
+| GDELT 2.0 Global Knowledge Graph | Batch public-news reporting signal | `gdelt_news_signal_score` | Supplemental public-news signal context |
 | World Bank Metadata | Region and income metadata | `world_bank_region` | Regional grouping and summary analysis |
 | Manual Templates | Sanctions and FATF mutual-evaluation inputs | Supplemental templates | Future structured AML/CFT enhancement layers |
 
@@ -150,6 +169,193 @@ The final vulnerability score is scaled from 0 to 100.
 
 ---
 
+## ACLED Recent Conflict and Unrest Signal Layer
+
+The project includes an ACLED enrichment layer that collects and scores recent conflict, unrest, and political-violence events.
+
+ACLED is used as a **supplemental live-signal layer**. It does not replace the baseline terrorism-financing vulnerability score.
+
+The ACLED workflow includes:
+
+1. OAuth-based ACLED data collection
+2. Paginated event retrieval
+3. Raw event checkpointing
+4. Existing-file reuse to avoid unnecessary redownloads
+5. Event-type filtering
+6. Recent lookback-window filtering
+7. Country-level signal scoring
+8. Signal-level classification
+9. Integration into the threat finance intelligence layer
+
+The ACLED lookback window is controlled in `src/config.py`:
+
+```python
+ACLED_LOOKBACK_DAYS = 180
+```
+
+The ACLED signal score uses:
+
+- Total recent event count
+- Fatalities
+- Fatal event count
+- Political violence events
+- Unrest events
+- Strategic development events
+
+ACLED signal levels are classified as:
+
+| Score | Signal Level |
+|---:|---|
+| 80+ | Severe |
+| 35+ | High |
+| 20+ | Moderate |
+| > 0 | Low |
+| 0 | No Recorded Recent Signal |
+
+ACLED signals are early-warning and collection-priority context only. They are not evidence of terrorism financing, criminality, sanctions exposure, or illicit activity.
+
+---
+
+## Global Organized Crime Index Layer
+
+The project includes a Global Organized Crime Index enrichment layer that adds country-level organized-crime exposure and resilience context.
+
+This layer is used as **supplemental convergence context** for analyst review and collection prioritization. It does not replace the baseline terrorism-financing vulnerability score.
+
+The organized-crime workflow includes:
+
+1. Downloading or reusing the Global Organized Crime Index workbook
+2. Detecting country-level criminality and resilience fields
+3. Selecting the latest available index year
+4. Creating organized-crime exposure and resilience-gap scores
+5. Creating a combined organized-crime vulnerability score
+6. Matching index records to modeled countries
+7. Saving an enrichment table and chart
+8. Integrating organized-crime context into the threat finance intelligence layer
+
+The organized-crime score uses:
+
+- Criminality score
+- Criminal markets score, when available
+- Criminal actors score, when available
+- Resilience score
+- Organized-crime exposure score
+- Organized-crime resilience-gap score
+
+The combined organized-crime vulnerability score is scaled from 0 to 100 and classified as:
+
+| Score | Level |
+|---:|---|
+| 80+ | Very High |
+| 65+ | High |
+| 45+ | Moderate |
+| > 0 | Low |
+| No score | No Data / Unknown |
+
+The organized-crime layer is not evidence of terrorism financing, criminality, sanctions exposure, illicit finance, or activity by any specific person, entity, account, wallet, or network.
+
+---
+
+## GDELT 2.0 Batch Public-News Signal Layer
+
+The project includes a GDELT 2.0 batch public-news signal layer that adds recent media-reporting context using locally filtered Global Knowledge Graph batch files.
+
+This layer is used as **supplemental public-news signal context** for analyst review and collection prioritization. It does not replace the baseline terrorism-financing vulnerability score.
+
+The project uses GDELT 2.0 batch files rather than one country-by-country DOC API query per modeled jurisdiction. This reduces rate-limit exposure and supports repeatable local filtering.
+
+The GDELT workflow includes:
+
+1. Fetching the GDELT 2.0 master file list
+2. Selecting the most recent GKG batch files
+3. Downloading or reusing GKG ZIP files
+4. Filtering GKG records locally for threat-finance-related keywords
+5. Matching structured GDELT location fields to modeled countries
+6. Aggregating matched records and matched source counts by country
+7. Calculating average GDELT tone where available
+8. Creating record-count, source-diversity, and negative-tone component scores
+9. Creating a combined GDELT public-news signal score
+10. Saving an enrichment table and chart
+11. Integrating the signal into the threat finance intelligence layer
+
+The GDELT batch settings are controlled in `src/config.py`:
+
+```python
+GDELT_BATCH_MAX_FILES = 24
+GDELT_BATCH_SLEEP_SECONDS = 0.5
+GDELT_BATCH_TIMEOUT_SECONDS = 60
+GDELT_BATCH_REUSE_RAW_FILES = True
+GDELT_BATCH_RAW_DIR = RAW_DATA_DIR / "gdelt_gkg"
+```
+
+The GDELT output includes:
+
+- Batch file count
+- Matched GKG record count
+- Matched source count
+- Average tone
+- Record-count score
+- Source-diversity score
+- Negative-tone score
+- Combined GDELT news signal score
+- GDELT signal level
+- Batch match status
+
+The GDELT signal levels are classified as:
+
+| Score | Signal Level |
+|---:|---|
+| 80+ | Very High |
+| 60+ | High |
+| 35+ | Moderate |
+| > 0 | Low |
+| 0 | No Recorded Recent Signal |
+
+GDELT signals are public-news context only. They may reflect media bias, duplication, translation artifacts, false positives, or uneven country coverage. They are not evidence of terrorism financing, criminality, sanctions exposure, illicit finance, or activity by any specific person, entity, account, wallet, or network.
+
+---
+
+## Threat Finance Intelligence Gap and Collection-Priority Layer
+
+The project includes a threat finance intelligence layer that converts the baseline risk output into a public-source collection-priority workflow.
+
+This layer asks:
+
+> Given the baseline risk score and available public-source coverage, what should an analyst collect or validate next?
+
+The layer creates:
+
+| Output Field | Purpose |
+|---|---|
+| `baseline_tf_risk_score` | Preserved baseline vulnerability score |
+| `baseline_tf_risk_level` | Qualitative baseline risk level |
+| `live_signal_score` | Recent/current signal score from FATF, model probability, UCDP, ACLED, organized-crime context, GDELT public-news context, and available supplements |
+| `live_signal_driver_count` | Number of live-signal components available |
+| `source_coverage_score` | Percentage of required source areas covered |
+| `source_staleness_score` | Average source staleness score |
+| `intelligence_gap_score` | Missing/stale/weak-source gap score |
+| `intelligence_gap_level` | Low / Moderate / High / Critical gap category |
+| `collection_priority_score` | Public-source collection-priority score |
+| `collection_priority_level` | Routine / Moderate / High / Immediate Review |
+| `recommended_collection_focus` | Suggested public-source validation focus |
+| `analyst_note` | Conservative analyst-review note |
+
+Required collection areas include:
+
+- Sanctions
+- Conflict
+- AML/CFT
+- Organized crime
+- GDELT / public-news reporting
+- Governance
+- Crypto or virtual-asset risk
+- Enforcement actions
+- Recent terrorism-financing reporting
+
+This layer is a collection-planning and review aid only. It does not make terrorism, criminality, sanctions, or illicit-finance determinations.
+
+---
+
 ## Process Summary
 
 The pipeline follows this workflow:
@@ -163,8 +369,10 @@ The pipeline follows this workflow:
 7. Apply transparent baseline weights.
 8. Rank countries by the final 0-to-100 terrorism-financing vulnerability score.
 9. Fit a logistic classification model to compare risk indicators against FATF grey-list status.
-10. Add supplemental interpretation layers such as risk tiers, sensitivity analysis, conflict exposure, regional summaries, and current FATF comparison.
-11. Generate charts, tables, a Word report, a PDF report, and an optional Streamlit dashboard.
+10. Add supplemental interpretation layers such as risk tiers, sensitivity analysis, UCDP conflict exposure, ACLED recent-event signals, Global Organized Crime Index enrichment, GDELT 2.0 batch public-news signal enrichment, regional summaries, and current FATF comparison.
+11. Run GDELT 2.0 batch public-news signal enrichment.
+12. Run threat finance intelligence gap and collection-priority analysis.
+13. Generate charts, tables, a Word report, a PDF report, and an optional Streamlit dashboard.
 
 ---
 
@@ -212,7 +420,12 @@ terrorism_financing_osint_model/
 │   ├── enhanced_analysis.py
 │   ├── current_data_supplement.py
 │   ├── conflict_data_supplement.py
+│   ├── acled_data_collection.py
+│   ├── acled_enrichment.py
+│   ├── organized_crime_enrichment.py
+│   ├── gdelt_batch_enrichment.py
 │   ├── additional_risk_factors.py
+│   ├── threat_finance_intelligence.py
 │   ├── visualization.py
 │   ├── report_generator.py
 │
@@ -257,10 +470,14 @@ scikit-learn
 python-docx
 docx2pdf
 streamlit
+python-dotenv
+openpyxl
 ```
 
 Notes:
 
+- `python-dotenv` is required for loading local ACLED credentials from `.env`.
+- `openpyxl` is required for reading the Global Organized Crime Index Excel workbook.
 - `docx2pdf` works best on Windows when Microsoft Word is installed.
 - If PDF conversion fails, the Word report should still be created.
 - Streamlit is required for the optional dashboard in `app.py`.
@@ -277,10 +494,15 @@ The full project pipeline runs the following steps:
 4. Modeling
 5. Enhanced Analysis
 6. Current Data Supplement
-7. Conflict Data Supplement
-8. Additional Risk Factor Analysis
-9. Visualization
-10. Report Generation
+7. UCDP Conflict Data Supplement
+8. ACLED Data Collection
+9. ACLED Signal Enrichment
+10. Global Organized Crime Index Enrichment
+11. GDELT 2.0 Batch Public-News Signal Enrichment
+12. Additional Risk Factor Analysis
+13. Threat Finance Intelligence Gap Analysis
+14. Visualization
+15. Report Generation
 
 Run the full pipeline with:
 
@@ -310,10 +532,34 @@ From the project root, run any module individually:
 .\.venv\Scripts\python.exe -m src.enhanced_analysis
 .\.venv\Scripts\python.exe -m src.current_data_supplement
 .\.venv\Scripts\python.exe -m src.conflict_data_supplement
+.\.venv\Scripts\python.exe -m src.acled_data_collection
+.\.venv\Scripts\python.exe -m src.acled_enrichment
+.\.venv\Scripts\python.exe -m src.organized_crime_enrichment
+.\.venv\Scripts\python.exe -m src.gdelt_batch_enrichment
 .\.venv\Scripts\python.exe -m src.additional_risk_factors
+.\.venv\Scripts\python.exe -m src.threat_finance_intelligence
 .\.venv\Scripts\python.exe -m src.visualization
 .\.venv\Scripts\python.exe -m src.report_generator
 ```
+
+---
+
+## ACLED Credentials
+
+ACLED API access requires credentials. Store them in a local `.env` file in the project root:
+
+```text
+ACLED_USERNAME=your_myacled_email_here
+ACLED_PASSWORD=your_myacled_password_here
+```
+
+Make sure `.env` is listed in `.gitignore`:
+
+```text
+.env
+```
+
+The ACLED data collection step reuses `data/raw/acled_events.csv` when available, so the project does not need to redownload the ACLED dataset on every run.
 
 ---
 
@@ -339,6 +585,10 @@ The dashboard includes:
 - Country rankings
 - Model results
 - Enhanced analysis
+- Intelligence gap analysis
+- ACLED signal layer
+- Organized crime layer
+- GDELT news signal layer
 - Current FATF context
 - Conflict supplement
 - Regional analysis
@@ -371,6 +621,10 @@ Choose .venv\Scripts\python.exe
 |---|---|
 | `data/raw/world_bank_country_indicators.csv` | Raw World Bank indicator dataset |
 | `data/raw/ucdp_conflict_country_year_raw.csv` | Raw UCDP organized-violence country-year dataset |
+| `data/raw/acled_events.csv` | Raw ACLED event dataset |
+| `data/raw/acled_events_checkpoint.csv` | ACLED checkpoint file |
+| `data/raw/global_oc_index.xlsx` | Global Organized Crime Index workbook |
+| `data/raw/gdelt_gkg/` | Cached GDELT 2.0 GKG batch ZIP files |
 | `data/processed/processed_country_risk_data.csv` | Cleaned country-level model dataset |
 
 ### Tables
@@ -393,12 +647,17 @@ Choose .venv\Scripts\python.exe
 | `outputs/tables/current_data_supplement.csv` | Current data supplement |
 | `outputs/tables/current_fatf_status_comparison.csv` | Current FATF comparison |
 | `outputs/tables/conflict_data_supplement.csv` | UCDP conflict exposure supplement |
+| `outputs/tables/acled_signal_enrichment.csv` | ACLED country-level recent conflict/unrest signal enrichment |
+| `outputs/tables/organized_crime_enrichment.csv` | Global Organized Crime Index country-level enrichment |
+| `outputs/tables/gdelt_news_signal_enrichment.csv` | GDELT 2.0 batch public-news signal enrichment |
 | `outputs/tables/top_risk_drivers.csv` | Largest weighted score contributors |
 | `outputs/tables/country_region_mapping.csv` | Country-to-region mapping |
 | `outputs/tables/regional_risk_summary.csv` | Regional risk summary |
 | `outputs/tables/sanctions_exposure_supplement.csv` | Sanctions exposure supplement |
 | `outputs/tables/fatf_mutual_evaluation_supplement.csv` | FATF mutual-evaluation supplement |
 | `outputs/tables/additional_risk_factor_summary.csv` | Additional factor output summary |
+| `outputs/tables/threat_finance_collection_priorities.csv` | Intelligence-gap and collection-priority output |
+| `outputs/tables/source_register.csv` | Source register |
 
 ### Charts
 
@@ -413,6 +672,11 @@ Choose .venv\Scripts\python.exe
 | `outputs/charts/regional_average_risk_score.png` | Regional average risk score |
 | `outputs/charts/regional_fatf_count.png` | Current FATF increased-monitoring count by region |
 | `outputs/charts/current_fatf_status_comparison.png` | Current FATF status comparison |
+| `outputs/charts/top_15_collection_priority_scores.png` | Top threat finance collection-priority scores |
+| `outputs/charts/intelligence_gap_distribution.png` | Threat finance intelligence-gap distribution |
+| `outputs/charts/top_15_acled_conflict_signal_scores.png` | Top ACLED recent conflict/unrest signal scores |
+| `outputs/charts/top_15_organized_crime_vulnerability_scores.png` | Top organized-crime vulnerability scores |
+| `outputs/charts/top_15_gdelt_news_signal_scores.png` | Top GDELT 2.0 batch public-news signal scores |
 
 ### Reports
 
@@ -448,7 +712,11 @@ The generated report includes:
 - Sensitivity Analysis
 - Top Risk Drivers
 - Conflict Event Data Supplement
+- ACLED Recent Conflict and Unrest Signal Supplement
+- Global Organized Crime Index Supplement
+- GDELT 2.0 Batch Public-News Signal Supplement
 - Additional Risk Factor Analysis
+- Threat Finance Intelligence Gap and Collection Prioritization
 - Current Data Supplement and Forward-Looking Risk Context
 - Official Terrorism Designation Context by Region
 - South Africa Case Study: FATF Grey-List Remediation and FIU Context
@@ -484,6 +752,11 @@ The generated report includes chart explanations for all major visuals:
 7. **Regional average risk** — compares average vulnerability across World Bank regions.
 8. **Current FATF count by region** — summarizes current increased-monitoring jurisdictions by region.
 9. **Current FATF status comparison** — compares model-year FATF target coding with the current FATF monitoring supplement.
+10. **Top collection priorities** — shows where baseline risk, live signal, source staleness, and intelligence gaps create the highest public-source collection priorities.
+11. **Intelligence-gap distribution** — shows how source gaps and stale or weak source coverage are distributed across modeled countries.
+12. **ACLED recent conflict and unrest signals** — summarizes recent country-level conflict/unrest signal strength for analyst review.
+13. **Organized-crime vulnerability scores** — summarizes where criminality exposure and resilience gaps may provide useful convergence context for analyst review.
+14. **GDELT 2.0 batch public-news signal scores** — summarizes where locally filtered GDELT media-reporting signals may support refreshed public-source review.
 
 ---
 
@@ -491,7 +764,7 @@ The generated report includes chart explanations for all major visuals:
 
 The project includes several supplemental layers that improve interpretation without changing the baseline risk score.
 
-### Conflict Event Data Supplement
+### UCDP Conflict Event Data Supplement
 
 Uses UCDP country-year organized violence data as supplemental instability context.
 
@@ -504,6 +777,103 @@ This layer provides:
 - Conflict exposure chart
 
 Conflict exposure does not prove terrorism financing activity. It is used as contextual instability information.
+
+### ACLED Recent Conflict and Unrest Signal Supplement
+
+Uses ACLED recent event data to create a country-level signal table.
+
+This layer provides:
+
+- Event count
+- Fatality count
+- Fatal event count
+- Political violence event count
+- Unrest event count
+- Strategic development event count
+- Latest event date
+- ACLED conflict signal score
+- ACLED signal level
+
+ACLED output is used in:
+
+- `outputs/tables/acled_signal_enrichment.csv`
+- `outputs/tables/threat_finance_collection_priorities.csv`
+- `outputs/charts/top_15_acled_conflict_signal_scores.png`
+- Streamlit dashboard ACLED signal layer
+- Report ACLED supplement section
+
+ACLED signal does not prove terrorism financing activity. It is used as recent public-source conflict and unrest context.
+
+### Global Organized Crime Index Supplement
+
+Uses the Global Organized Crime Index to add country-level organized-crime exposure and resilience context.
+
+This layer provides:
+
+- Index year
+- Criminality score
+- Criminal markets score, when available
+- Criminal actors score, when available
+- Resilience score
+- Organized-crime exposure score
+- Organized-crime resilience-gap score
+- Organized-crime vulnerability score
+- Organized-crime level
+
+Organized-crime output is used in:
+
+- `outputs/tables/organized_crime_enrichment.csv`
+- `outputs/tables/threat_finance_collection_priorities.csv`
+- `outputs/charts/top_15_organized_crime_vulnerability_scores.png`
+- Streamlit dashboard organized crime layer
+- Report Global Organized Crime Index supplement section
+
+The organized-crime layer does not prove terrorism financing activity, criminality, sanctions exposure, or illicit activity. It is used as country-level convergence context for analyst review.
+
+### GDELT 2.0 Batch Public-News Signal Supplement
+
+Uses recent GDELT 2.0 Global Knowledge Graph batch files to create a country-level public-news signal table.
+
+This layer provides:
+
+- Batch file count
+- Matched GKG record count
+- Matched source count
+- Average GDELT tone
+- Record-count score
+- Source-diversity score
+- Negative-tone score
+- GDELT public-news signal score
+- GDELT signal level
+- Batch match status
+
+GDELT output is used in:
+
+- `outputs/tables/gdelt_news_signal_enrichment.csv`
+- `outputs/tables/threat_finance_collection_priorities.csv`
+- `outputs/charts/top_15_gdelt_news_signal_scores.png`
+- Streamlit dashboard GDELT news signal layer
+- Report GDELT 2.0 Batch Public-News Signal Supplement section
+
+The GDELT layer does not prove terrorism financing activity, criminality, sanctions exposure, or illicit activity. It is used as recent public-news and media-reporting context for analyst review and collection prioritization.
+
+### Threat Finance Intelligence Gap and Collection Prioritization
+
+This layer converts model output into public-source collection tasking logic.
+
+It provides:
+
+- Baseline terrorism-financing risk score
+- Live signal score
+- Source coverage score
+- Source staleness score
+- Intelligence gap score
+- Collection priority score
+- Recommended collection focus
+- Analyst note
+- Source register
+
+This layer helps identify where an analyst should refresh or validate source coverage. It does not make operational, legal, compliance, or investigative conclusions.
 
 ### Regional Risk Summary
 
@@ -570,7 +940,8 @@ Possible use cases:
 - Comparing internal risk views against public indicators
 - Supporting risk committee discussion
 - Supporting academic model documentation
-- Adding context to FATF monitoring, conflict exposure, and regional analysis
+- Adding context to FATF monitoring, conflict exposure, ACLED recent-event signals, organized-crime convergence context, GDELT 2.0 batch public-news signals, and regional analysis
+- Creating collection-priority workflows for public-source review
 - Creating a transparent portfolio project for financial-crime, intelligence, and risk analytics roles
 
 The model should not be used for:
@@ -581,6 +952,9 @@ The model should not be used for:
 - Transaction monitoring decisions by itself
 - Entity-level or customer-level conclusions
 - Terrorist-financing determinations
+- Sanctions determinations
+- Criminality determinations
+- Conclusions about individuals, entities, networks, wallets, accounts, or transactions
 
 ---
 
@@ -593,7 +967,16 @@ Key limitations include:
 - The model does not include detailed legal, supervisory, enforcement, or financial intelligence data.
 - Some countries may have missing or delayed economic data.
 - The model does not use 2025 or 2026 as the primary model year because complete comparable country-level data is not available across the core indicators.
-- Conflict event data is supplemental context and is not evidence of terrorism financing activity.
+- UCDP conflict event data is supplemental context and is not evidence of terrorism financing activity.
+- ACLED recent event data is supplemental context and is not evidence of terrorism financing activity.
+- ACLED coverage, coding, reporting density, and licensing constraints may vary by country.
+- ACLED API access requires valid credentials and may be subject to access limitations.
+- Global Organized Crime Index data is supplemental context and is not evidence of terrorism financing or criminality.
+- The Global Organized Crime Index may not capture fast-moving changes, subnational variation, or case-level organized-crime activity.
+- GDELT 2.0 batch public-news data is supplemental context and is not evidence of terrorism financing, criminality, sanctions exposure, or illicit activity.
+- GDELT media signals may reflect duplication, media bias, translation artifacts, false positives, and uneven country coverage.
+- GDELT country matching depends on structured location extraction and country-name harmonization.
+- The threat finance intelligence-gap layer is a collection-priority tool, not a detection system.
 - UCDP country matching depends on country-name harmonization.
 - Sanctions exposure and FATF mutual-evaluation supplements are template-based unless structured values are manually populated.
 - The model does not directly measure virtual-asset activity, privacy-coin exposure, wallet-level behavior, crowdfunding, or online fundraising appeals.
@@ -615,8 +998,11 @@ Potential future extensions include:
 - Add a legal and regulatory framework supplement covering AML/CFT statutory scope, beneficial ownership transparency, supervisory coverage, enforcement activity, and digital-asset AML/CFT regulation.
 - Add an emerging terrorist-financing typologies supplement covering fintech, instant payments, virtual assets, online crowdfunding, online gaming, and public-private information-sharing maturity.
 - Add model-governance tracking that evaluates whether supplemental indicators improve screening performance, ranking stability, and alignment with official illicit-finance strategy benchmarks over time.
-- Refine conflict event data matching with a country-name crosswalk.
+- Refine UCDP, ACLED, and GDELT country matching with a country-name and ISO-code crosswalk.
 - Add AML/CFT mutual evaluation data with technical compliance and effectiveness ratings.
+- Refine organized-crime exposure integration with additional subnational or typology-specific context where reliable public data is available.
+- Add populated enforcement-action and public-reporting supplements.
+- Expand GDELT batch processing to support longer time windows, rolling historical comparison, and country-profile drilldowns.
 - Expand sensitivity analysis with additional weighting scenarios.
 - Refine risk-tier interpretation with regional and peer-group comparisons.
 - Add additional current FATF comparison visuals over multiple FATF update cycles.
@@ -648,6 +1034,7 @@ Recommended generated files to exclude:
 - `outputs/tables/`
 - `outputs/reports/`
 - `.venv/`
+- `.env`
 
 To keep empty folders in Git, create `.gitkeep` files:
 
@@ -665,36 +1052,38 @@ New-Item -ItemType File -Force outputs/reports/.gitkeep
 
 The project uses and references sources such as:
 
-1. World Bank Worldwide Governance Indicators
-2. World Bank WGI 2025 Revision / WGI 2.0
-3. World Bank Reproducibility Package for the WGI 2025 Update
-4. World Bank DataBank Worldwide Governance Indicators
-5. World Bank API / World Development Indicators
-6. Uppsala Conflict Data Program Country-Year Dataset on Organized Violence
-7. Financial Action Task Force official sources
-8. FATF Black and Grey Lists
-9. FATF Recommendations
-10. FATF Comprehensive Update on Terrorist Financing Risks
-11. U.S. Department of the Treasury National Terrorist Financing Risk Assessment
-12. U.S. Department of the Treasury 2024 National Strategy for Combating Terrorist and Other Illicit Financing
-13. National Counterterrorism Center, DHS, and FBI public guidance
-14. INTERPOL Global Counter-Terrorism Strategy
-15. Basel Committee on Banking Supervision AML/CFT risk management guidance
-16. South Africa Financial Intelligence Centre Annual Report 2024/25
-17. UN Security Council ISIL/Da'esh and Al-Qaida sanctions list
-18. U.S. Department of State Foreign Terrorist Organizations list
-19. GNET research on privacy coins and illicit-finance risk
-20. UAE AML/CFT/CPF National Strategy 2024-2027 context
-21. Australia AML/CTF Amendment Act 2024 context
-22. European Banking Authority Travel Rule Guidelines
-23. Congressional Research Service AML/CFT policy overview
-24. U.S. Government Accountability Office illicit-finance progress assessment
-25. RUSI 2025 terrorist-financing reassessment context
-
+- World Bank Worldwide Governance Indicators
+- World Bank WGI 2025 Revision / WGI 2.0
+- World Bank Reproducibility Package for the WGI 2025 Update
+- World Bank DataBank Worldwide Governance Indicators
+- World Bank API / World Development Indicators
+- Uppsala Conflict Data Program Country-Year Dataset on Organized Violence
+- ACLED Conflict and Political Violence Event Data
+- Global Organized Crime Index
+- GDELT 2.0 Global Knowledge Graph and GDELT 2.0 batch files
+- Financial Action Task Force official sources
+- FATF Black and Grey Lists
+- FATF Recommendations
+- FATF Comprehensive Update on Terrorist Financing Risks
+- U.S. Department of the Treasury National Terrorist Financing Risk Assessment
+- U.S. Department of the Treasury 2024 National Strategy for Combating Terrorist and Other Illicit Financing
+- National Counterterrorism Center, DHS, and FBI public guidance
+- INTERPOL Global Counter-Terrorism Strategy
+- Basel Committee on Banking Supervision AML/CFT risk management guidance
+- South Africa Financial Intelligence Centre Annual Report 2024/25
+- UN Security Council ISIL/Da'esh and Al-Qaida sanctions list
+- U.S. Department of State Foreign Terrorist Organizations list
+- GNET research on privacy coins and illicit-finance risk
+- UAE AML/CFT/CPF National Strategy 2024-2027 context
+- Australia AML/CTF Amendment Act 2024 context
+- European Banking Authority Travel Rule Guidelines
+- Congressional Research Service AML/CFT policy overview
+- U.S. Government Accountability Office illicit-finance progress assessment
+- RUSI 2025 terrorist-financing reassessment context
 ---
 
 ## Disclaimer
 
 This project is for academic, defensive, and financial-crime risk research purposes only.
 
-It does not provide operational guidance, investigative conclusions, terrorist-financing determinations, or compliance advice. Outputs should be reviewed with appropriate qualitative context and official sources before any practical use.
+It does not provide operational guidance, investigative conclusions, terrorist-financing determinations, criminality determinations, sanctions determinations, or compliance advice. Outputs should be reviewed with appropriate qualitative context and official sources before any practical use.

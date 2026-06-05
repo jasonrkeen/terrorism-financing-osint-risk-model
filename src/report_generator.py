@@ -14,6 +14,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from pathlib import Path
+from pydoc import doc
 from typing import Iterable
 
 import pandas as pd
@@ -52,6 +53,12 @@ from src.config import (
     REGIONAL_AVERAGE_RISK_CHART_FILE,
     REGIONAL_FATF_COUNT_CHART_FILE,
     CURRENT_FATF_STATUS_COMPARISON_CHART_FILE,
+    TOP_15_COLLECTION_PRIORITY_CHART_FILE,
+    INTELLIGENCE_GAP_DISTRIBUTION_CHART_FILE,
+    ACLED_SIGNAL_TOP_15_CHART_FILE,
+    ACLED_SIGNAL_ENRICHMENT_FILE,
+    GDELT_NEWS_SIGNAL_ENRICHMENT_FILE,
+    TOP_15_GDELT_NEWS_SIGNAL_CHART_FILE,
 )
 
 
@@ -67,6 +74,27 @@ MAX_TOP_DRIVER_ROWS = 10
 MAX_CONFLICT_ROWS = 12
 MAX_CURRENT_FATF_ROWS = 12
 MAX_CELL_TEXT_LENGTH = 120
+MAX_COLLECTION_PRIORITY_ROWS = 15
+MAX_SOURCE_REGISTER_ROWS = 12
+MAX_ACLED_SIGNAL_ROWS = 12
+MAX_ORGANIZED_CRIME_ROWS = 12
+MAX_GDELT_SIGNAL_ROWS = 12
+
+THREAT_FINANCE_COLLECTION_PRIORITIES_FILE = Path(
+    "outputs/tables/threat_finance_collection_priorities.csv"
+)
+
+THREAT_FINANCE_SOURCE_REGISTER_FILE = Path(
+    "outputs/tables/source_register.csv"
+)
+
+ORGANIZED_CRIME_ENRICHMENT_FILE = Path(
+    "outputs/tables/organized_crime_enrichment.csv"
+)
+
+TOP_15_ORGANIZED_CRIME_CHART_FILE = Path(
+    "outputs/charts/top_15_organized_crime_vulnerability_scores.png"
+)
 
 REPORT_AUTHOR_NAME = "Jason Keen"
 REPORT_AUTHOR_CONTACT = "keenjasonr@gmail.com"
@@ -716,6 +744,236 @@ def prepare_current_fatf_table(df: pd.DataFrame) -> pd.DataFrame:
     )
 
 
+def prepare_collection_priority_table(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Prepare threat finance collection priority table for the report.
+    """
+
+    output = df.copy()
+
+    if "collection_priority_score" in output.columns:
+        output = output.sort_values(
+            "collection_priority_score",
+            ascending=False,
+        )
+
+    rename_map = {
+        "country": "Country",
+        "iso3": "ISO3",
+        "baseline_tf_risk_score": "Baseline Risk",
+        "baseline_tf_risk_level": "Risk Level",
+        "live_signal_score": "Live Signal",
+        "source_staleness_score": "Source Staleness",
+        "intelligence_gap_score": "Intel Gap",
+        "intelligence_gap_level": "Gap Level",
+        "collection_priority_score": "Collection Priority",
+        "collection_priority_level": "Priority Level",
+        "recommended_collection_focus": "Recommended Focus",
+        "analyst_note": "Analyst Note",
+    }
+
+    output = output.rename(columns=rename_map)
+
+    numeric_columns = [
+        "Baseline Risk",
+        "Live Signal",
+        "Source Staleness",
+        "Intel Gap",
+        "Collection Priority",
+    ]
+
+    for column in numeric_columns:
+        if column in output.columns:
+            output[column] = output[column].apply(lambda value: safe_number(value, 2))
+
+    return output
+
+
+def prepare_acled_signal_table(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Prepare ACLED recent conflict and unrest signal table for the report.
+    """
+
+    output = df.copy()
+
+    if "acled_conflict_signal_score" in output.columns:
+        output = output.sort_values(
+            "acled_conflict_signal_score",
+            ascending=False,
+        )
+
+    rename_map = {
+        "country": "Country",
+        "iso3": "ISO / Code",
+        "acled_event_count": "Events",
+        "acled_fatalities": "Fatalities",
+        "acled_political_violence_events": "Political Violence",
+        "acled_unrest_events": "Unrest",
+        "acled_conflict_signal_score": "ACLED Signal",
+        "acled_signal_level": "Signal Level",
+        "acled_latest_event_date": "Latest Event",
+    }
+
+    output = output.rename(columns=rename_map)
+
+    for column in ["Events", "Fatalities", "Political Violence", "Unrest"]:
+        if column in output.columns:
+            output[column] = output[column].apply(safe_int)
+
+    if "ACLED Signal" in output.columns:
+        output["ACLED Signal"] = output["ACLED Signal"].apply(
+            lambda value: safe_number(value, 2)
+        )
+
+    return output
+
+
+def prepare_organized_crime_table(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Prepare Global Organized Crime Index enrichment table for the report.
+
+    The enrichment output may contain both country_code and iso3. This function
+    keeps one ISO3 display field to avoid duplicate column names in the Word
+    report table.
+    """
+
+    output = df.copy()
+
+    if "organized_crime_score" in output.columns:
+        output = output.sort_values(
+            "organized_crime_score",
+            ascending=False,
+        )
+
+    if "country_code" in output.columns:
+        output["display_iso3"] = output["country_code"]
+    elif "iso3" in output.columns:
+        output["display_iso3"] = output["iso3"]
+    else:
+        output["display_iso3"] = "N/A"
+
+    rename_map = {
+        "country": "Country",
+        "display_iso3": "ISO3",
+        "oc_index_year": "Index Year",
+        "criminality_score": "Criminality",
+        "criminal_markets_score": "Markets",
+        "criminal_actors_score": "Actors",
+        "resilience_score": "Resilience",
+        "organized_crime_exposure_score": "Exposure",
+        "organized_crime_resilience_gap_score": "Resilience Gap",
+        "organized_crime_score": "OC Vulnerability",
+        "organized_crime_level": "OC Level",
+    }
+
+    output = output.rename(columns=rename_map)
+
+    # Drop duplicate column names defensively before Word table rendering.
+    output = output.loc[:, ~output.columns.duplicated()].copy()
+
+    numeric_columns = [
+        "Criminality",
+        "Markets",
+        "Actors",
+        "Resilience",
+        "Exposure",
+        "Resilience Gap",
+        "OC Vulnerability",
+    ]
+
+    for column in numeric_columns:
+        if column in output.columns:
+            output[column] = output[column].apply(lambda value: safe_number(value, 2))
+
+    if "Index Year" in output.columns:
+        output["Index Year"] = output["Index Year"].apply(safe_year)
+
+    return output
+
+
+def prepare_gdelt_signal_table(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Prepare GDELT 2.0 batch public-news signal enrichment table for the report.
+
+    The current GDELT layer uses batch GKG files. Some backward-compatible
+    columns from the earlier DOC API prototype may still appear in outputs, but
+    the preferred display fields are batch-file count, matched GKG records,
+    matched source count, average tone, and signal score.
+    """
+
+    output = df.copy()
+
+    if "gdelt_news_signal_score" in output.columns:
+        output = output.sort_values(
+            "gdelt_news_signal_score",
+            ascending=False,
+        )
+
+    rename_map = {
+        "country": "Country",
+        "country_code": "ISO3",
+        "gdelt_batch_file_count": "Batch Files",
+        "gdelt_matching_record_count": "Matched Records",
+        "gdelt_matching_source_count": "Matched Sources",
+        "gdelt_average_tone": "Average Tone",
+        "gdelt_record_count_score": "Record Score",
+        "gdelt_source_diversity_score": "Source Score",
+        "gdelt_negative_tone_score": "Tone Score",
+        "gdelt_news_signal_score": "GDELT Signal",
+        "gdelt_news_signal_level": "Signal Level",
+        "gdelt_query_status": "Batch Status",
+        "gdelt_confidence": "Confidence",
+        "gdelt_days_since_update": "Days Since Update",
+        "gdelt_latest_file_datetime": "Latest GDELT File",
+    }
+
+    output = output.rename(columns=rename_map)
+
+    integer_columns = [
+        "Batch Files",
+        "Matched Records",
+        "Matched Sources",
+        "Days Since Update",
+    ]
+
+    decimal_columns = [
+        "Average Tone",
+        "Record Score",
+        "Source Score",
+        "Tone Score",
+        "GDELT Signal",
+    ]
+
+    for column in integer_columns:
+        if column in output.columns:
+            output[column] = output[column].apply(safe_int)
+
+    for column in decimal_columns:
+        if column in output.columns:
+            output[column] = output[column].apply(lambda value: safe_number(value, 2))
+
+    return output
+
+
+def prepare_source_register_table(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Prepare source register table for the report.
+    """
+
+    output = df.copy()
+
+    rename_map = {
+        "source_name": "Source",
+        "source_type": "Type",
+        "coverage": "Coverage",
+        "use_in_model": "Use in Model",
+        "confidence_level": "Confidence",
+        "limitations": "Limitations",
+    }
+
+    return output.rename(columns=rename_map)
+
+
 def prepare_correlation_table(df: pd.DataFrame) -> pd.DataFrame:
     """
     Prepare a compact correlation table.
@@ -823,11 +1081,13 @@ def add_executive_summary(doc: Document, rankings_df: pd.DataFrame | None) -> No
                 "and comparison, not as replacement model-year observations."
             ),
             (
-                "The expanded project includes supplemental conflict-exposure data, top risk-driver "
-                "interpretation, regional summaries, sanctions-exposure templates, FATF mutual-evaluation "
-                "templates, official AML/CFT policy context, virtual-assets and Travel Rule context, "
-                "and additional visual outputs. These additions improve interpretation and future "
-                "extensibility, but they do not replace the primary country-level vulnerability score."
+                "The expanded project includes supplemental UCDP conflict-exposure data, ACLED recent "
+                "conflict and unrest signals, Global Organized Crime Index enrichment, GDELT 2.0 batch public-news "
+                "signal enrichment, top risk-driver interpretation, regional summaries, sanctions-exposure "
+                "templates, FATF mutual-evaluation templates, official AML/CFT policy context, virtual-assets "
+                "and Travel Rule context, threat finance intelligence-gap scoring, collection-priority scoring, "
+                "and additional visual outputs. These additions improve interpretation, collection planning, "
+                "and future extensibility, but they do not replace the primary country-level vulnerability score."
             ),
             (
                 "The model should be interpreted as a screening and prioritization tool, not as a "
@@ -930,6 +1190,24 @@ def add_project_overview(doc: Document) -> None:
             "Supplemental conflict-exposure context.",
         ],
         [
+            "ACLED",
+            "Recent conflict and political-violence event data",
+            "acled_conflict_signal_score",
+            "Supplemental recent conflict and unrest signal context.",
+        ],
+        [
+            "Global Organized Crime Index",
+            "Criminality and resilience scores",
+            "organized_crime_score",
+            "Supplemental organized-crime convergence context.",
+        ],
+        [
+            "GDELT",
+            "GDELT 2.0 batch public-news reporting signal",
+            "gdelt_news_signal_score",
+            "Supplemental public-news signal context.",
+        ],
+        [
             "World Bank country metadata",
             "Region and income metadata",
             "world_bank_region",
@@ -965,18 +1243,23 @@ def add_project_overview(doc: Document) -> None:
         doc,
         [
             (
-                "The model separates inputs into three categories. First, core quantitative inputs are "
+                "The model separates inputs into four categories. First, core quantitative inputs are "
                 "used directly in the baseline score: governance indicators, political stability, GDP per "
                 "capita, inflation, and unemployment. Second, FATF grey-list status is used as a comparison "
-                "and validation target, not as a direct scoring input. Third, conflict data, regional summaries, "
-                "current FATF monitoring status, sanctions templates, mutual-evaluation templates, and policy "
-                "sources are supplemental interpretation layers."
+                "and validation target, not as a direct scoring input. Third, UCDP conflict exposure, ACLED "
+                "recent conflict and unrest signals, Global Organized Crime Index context, GDELT 2.0 batch public-news "
+                "signal context, regional summaries, current FATF monitoring status, sanctions templates, "
+                "mutual-evaluation templates, and policy sources are supplemental interpretation layers. "
+                "Fourth, the threat finance intelligence layer converts baseline risk, live signals, source coverage, source staleness, and intelligence gaps "
+                "into collection-priority outputs for analyst review."
             ),
             (
                 "This separation is important for model governance. The baseline score remains transparent "
                 "and reproducible because it is calculated from a small set of public country-level indicators. "
-                "Supplemental layers help analysts interpret why a country may deserve additional review, but "
-                "they do not change the score unless they are explicitly added in a future model version."
+                "Supplemental layers help analysts interpret why a country may deserve additional review, while "
+                "the intelligence layer helps structure what public-source information should be refreshed or "
+                "validated next. These layers do not change the baseline score unless they are explicitly added "
+                "in a future model version."
             ),
         ],
     )
@@ -1006,10 +1289,14 @@ def add_methodology(doc: Document, rankings_df: pd.DataFrame | None) -> None:
                 "incomplete, or non-comparable country-year observations across the core indicators."
             ),
             (
-                "Conflict event data, regional summaries, sanctions exposure templates, FATF mutual-evaluation "
-                "templates, official policy sources, and virtual-asset regulatory context are added as supplemental "
-                "layers. They are used to improve interpretation and future extensibility, not to redefine the "
-                "baseline terrorism-financing vulnerability score."
+                "UCDP conflict exposure, ACLED recent conflict and unrest signals, Global Organized Crime "
+                "Index enrichment, GDELT 2.0 batch public-news signal enrichment, regional summaries, sanctions exposure "
+                "templates, FATF mutual-evaluation templates, official policy sources, and virtual-asset "
+                "regulatory context are added as "
+                "supplemental layers. The threat finance intelligence layer then uses baseline risk, live "
+                "signals, source coverage, source staleness, and intelligence gaps to support collection-priority "
+                "analysis. These layers improve interpretation and future extensibility, but they do not "
+                "redefine the baseline terrorism-financing vulnerability score."
             ),
         ],
     )
@@ -1024,7 +1311,9 @@ def add_methodology(doc: Document, rankings_df: pd.DataFrame | None) -> None:
         "Normalize all risk features to a common 0-to-1 scale and apply transparent baseline weights.",
         "Rank countries by the final 0-to-100 terrorism-financing vulnerability score.",
         "Fit a logistic classification model to compare the risk features against FATF grey-list status.",
-        "Add supplemental interpretation layers including risk tiers, sensitivity analysis, conflict exposure, regional summaries, and current FATF comparison.",
+        "Add supplemental interpretation layers including risk tiers, sensitivity analysis, UCDP conflict exposure, ACLED recent-event signals, Global Organized Crime Index enrichment, GDELT 2.0 batch public-news signal enrichment, regional summaries, and current FATF comparison.",
+        "Run threat finance intelligence-gap and collection-priority analysis to identify public-source review priorities.",
+        "Generate model charts, supplemental charts, Word/PDF reports, and dashboard-ready outputs.",
     ]
 
     for step in process_steps:
@@ -1293,6 +1582,7 @@ def add_modeling_results(doc: Document, rankings_df: pd.DataFrame | None) -> Non
         "The model can support early-stage geographic risk screening for financial crime, AML/CFT, and risk "
         "analytics teams. It is not intended to make final risk decisions, but it can help prioritize countries "
         "for deeper qualitative review and support structured discussion of governance, instability, conflict, "
+        "organized-crime convergence context, GDELT 2.0 batch public-news signals, "
         "and economic stress indicators."
     )
 
@@ -1301,7 +1591,7 @@ def add_modeling_results(doc: Document, rankings_df: pd.DataFrame | None) -> Non
         "Prioritization of countries for deeper qualitative analysis.",
         "Comparison of internal risk views against public data indicators.",
         "Support for risk committee discussion and model documentation.",
-        "Supplemental context for FATF monitoring, conflict exposure, and regional risk analysis.",
+        "Supplemental context for FATF monitoring, UCDP conflict exposure, ACLED recent-event signals, organized-crime convergence context, GDELT 2.0 batch public-news signals, and regional risk analysis.",
     ]:
         doc.add_paragraph(item, style="List Bullet")
 
@@ -1538,8 +1828,10 @@ def add_additional_risk_factors(
     doc.add_paragraph(
         "This section summarizes supplemental risk-factor outputs added to make the project more extensible. "
         "Regional summaries provide geographic structure, while the sanctions and FATF mutual-evaluation "
-        "templates create input files for future structured enhancements. These outputs are supplemental and "
-        "do not replace the baseline model score."
+        "templates create input files for future structured enhancements. ACLED, Global Organized Crime "
+        "Index, and GDELT outputs are handled as separate supplemental signal and convergence layers and "
+        "are summarized in dedicated sections below. These outputs are supplemental and do not replace "
+        "the baseline model score."
     )
 
     doc.add_heading("Regional Risk Summary", level=2)
@@ -1628,6 +1920,54 @@ def add_additional_risk_factors(
             }
         ).copy()
 
+        supplemental_rows = []
+
+        if ORGANIZED_CRIME_ENRICHMENT_FILE.exists():
+            organized_crime_df = read_csv_if_exists(ORGANIZED_CRIME_ENRICHMENT_FILE)
+            organized_crime_records = (
+                len(organized_crime_df)
+                if organized_crime_df is not None
+                else 0
+            )
+
+            if not display_df["Factor"].astype(str).str.contains(
+                "organized crime",
+                case=False,
+                na=False,
+            ).any():
+                supplemental_rows.append(
+                    {
+                        "Factor": "Global Organized Crime Index enrichment",
+                        "Status": "Created if organized-crime enrichment output exists",
+                        "Records Or Groups": organized_crime_records,
+                        "Output File": str(ORGANIZED_CRIME_ENRICHMENT_FILE),
+                    }
+                )
+
+        if GDELT_NEWS_SIGNAL_ENRICHMENT_FILE.exists():
+            gdelt_df = read_csv_if_exists(GDELT_NEWS_SIGNAL_ENRICHMENT_FILE)
+            gdelt_records = len(gdelt_df) if gdelt_df is not None else 0
+
+            if not display_df["Factor"].astype(str).str.contains(
+                "gdelt",
+                case=False,
+                na=False,
+            ).any():
+                supplemental_rows.append(
+                    {
+                        "Factor": "GDELT 2.0 batch public-news signal",
+                        "Status": "Created if GDELT batch enrichment output exists",
+                        "Records Or Groups": gdelt_records,
+                        "Output File": str(GDELT_NEWS_SIGNAL_ENRICHMENT_FILE),
+                    }
+                )
+
+        if supplemental_rows:
+            display_df = pd.concat(
+                [display_df, pd.DataFrame(supplemental_rows)],
+                ignore_index=True,
+            )
+
         if "Output File" in display_df.columns:
             display_df["Output File"] = display_df["Output File"].apply(
                 shorten_output_path
@@ -1639,6 +1979,555 @@ def add_additional_risk_factors(
             ["Factor", "Status", "Records Or Groups", "Output File"],
             ["Factor", "Status", "Records", "Output"],
         )
+
+
+def add_threat_finance_intelligence_gap_analysis(
+    doc: Document,
+    collection_priority_df: pd.DataFrame | None,
+    source_register_df: pd.DataFrame | None,
+) -> None:
+    """
+    Add threat finance intelligence gap and collection prioritization section.
+    """
+
+    doc.add_heading(
+        "Threat Finance Intelligence Gap and Collection Prioritization",
+        level=1,
+    )
+
+    add_paragraphs(
+        doc,
+        [
+            (
+                "This section adds an intelligence-cycle layer to the terrorism-financing "
+                "OSINT model. The baseline model estimates country-level structural "
+                "vulnerability. The threat finance intelligence layer asks a different "
+                "question: what information should an analyst collect next to validate, "
+                "challenge, or update the assessment?"
+            ),
+            (
+                "The collection-priority score combines baseline terrorism-financing risk, "
+                "recent or live signal strength, source staleness, intelligence gaps, and "
+                "decision relevance. The result is not a terrorism determination, sanctions "
+                "finding, or allegation of illicit activity. It is a public-source collection "
+                "planning aid for analyst review."
+            ),
+            (
+                "This section is designed to move the project from a static country-risk "
+                "ranking toward a more mature intelligence decision-support workflow: "
+                "risk score, intelligence gap, collection priority, and analyst review note."
+            ),
+        ],
+    )
+
+    if collection_priority_df is None or collection_priority_df.empty:
+        doc.add_paragraph(
+            "Threat finance collection-priority output was not available."
+        )
+        return
+
+    priority_count = len(collection_priority_df)
+
+    immediate_count = (
+        int(
+            (
+                collection_priority_df["collection_priority_level"]
+                == "Immediate Review"
+            ).sum()
+        )
+        if "collection_priority_level" in collection_priority_df.columns
+        else 0
+    )
+
+    high_count = (
+        int(
+            (
+                collection_priority_df["collection_priority_level"]
+                == "High Priority"
+            ).sum()
+        )
+        if "collection_priority_level" in collection_priority_df.columns
+        else 0
+    )
+
+    avg_gap = (
+        collection_priority_df["intelligence_gap_score"].mean()
+        if "intelligence_gap_score" in collection_priority_df.columns
+        else None
+    )
+
+    avg_priority = (
+        collection_priority_df["collection_priority_score"].mean()
+        if "collection_priority_score" in collection_priority_df.columns
+        else None
+    )
+
+    doc.add_paragraph(
+        f"The collection-priority output contains {priority_count:,} country records. "
+        f"{immediate_count:,} countries are classified as Immediate Review and "
+        f"{high_count:,} countries are classified as High Priority. "
+        f"The average intelligence-gap score is {safe_number(avg_gap, 2)}, and "
+        f"the average collection-priority score is {safe_number(avg_priority, 2)}."
+    )
+
+    doc.add_heading("Top Collection Priorities", level=2)
+
+    display_df = prepare_collection_priority_table(collection_priority_df)
+
+    add_dataframe_table(
+        doc,
+        display_df,
+        [
+            "Country",
+            "ISO3",
+            "Baseline Risk",
+            "Risk Level",
+            "Live Signal",
+            "Intel Gap",
+            "Gap Level",
+            "Collection Priority",
+            "Priority Level",
+        ],
+        [
+            "Country",
+            "ISO3",
+            "Baseline Risk",
+            "Risk Level",
+            "Live Signal",
+            "Intel Gap",
+            "Gap Level",
+            "Priority",
+            "Priority Level",
+        ],
+        max_rows=MAX_COLLECTION_PRIORITY_ROWS,
+    )
+
+    doc.add_paragraph(
+        "Detailed recommended collection-focus text is preserved in the CSV output "
+        "and analyst-note field. It is omitted from the PDF table to keep the "
+        "collection-priority table readable."
+    )
+
+    doc.add_heading("Analyst Review Interpretation", level=2)
+
+    add_paragraphs(
+        doc,
+        [
+            (
+                "Countries at the top of the collection-priority ranking are not being "
+                "identified as terrorism-financing actors or confirmed threat locations. "
+                "They are countries where the model indicates that structural risk, source "
+                "staleness, live-signal assumptions, and intelligence gaps justify deeper "
+                "public-source review."
+            ),
+            (
+                "The recommended collection focus should be treated as a tasking guide. "
+                "For example, a country may require refreshed sanctions review, updated "
+                "conflict reporting, AML/CFT effectiveness checks, enforcement-action review, "
+                "or additional terrorism-financing reporting validation."
+            ),
+            (
+                "The analyst note generated by the model is intentionally conservative. "
+                "It explains the review priority while stating that the output does not "
+                "constitute a determination of terrorism, criminality, sanctions exposure, "
+                "or illicit activity."
+            ),
+        ],
+    )
+
+    doc.add_heading("Source Register", level=2)
+
+    if source_register_df is not None and not source_register_df.empty:
+        source_display_df = prepare_source_register_table(source_register_df)
+
+        add_dataframe_table(
+            doc,
+            source_display_df,
+            [
+                "Source",
+                "Type",
+                "Coverage",
+                "Use in Model",
+                "Confidence",
+                "Limitations",
+            ],
+            [
+                "Source",
+                "Type",
+                "Coverage",
+                "Use in Model",
+                "Confidence",
+                "Limitations",
+            ],
+            max_rows=MAX_SOURCE_REGISTER_ROWS,
+        )
+
+        doc.add_paragraph(
+            "The source register is included to support model transparency. It documents "
+            "the public-source categories used or planned in the intelligence layer, their "
+            "analytical role, confidence level, and limitations."
+        )
+    else:
+        doc.add_paragraph("Source register output was not available.")
+
+
+def add_acled_signal_supplement(
+    doc: Document,
+    acled_df: pd.DataFrame | None,
+) -> None:
+    """
+    Add ACLED recent conflict and unrest signal supplement.
+    """
+
+    doc.add_heading("ACLED Recent Conflict and Unrest Signal Supplement", level=1)
+
+    add_paragraphs(
+        doc,
+        [
+            (
+                "This supplemental section summarizes ACLED recent conflict, unrest, "
+                "and political-violence signals. ACLED is used as a near-real-time "
+                "early-warning context layer for the live-signal and collection-priority "
+                "workflow. It does not replace the baseline terrorism-financing "
+                "vulnerability score."
+            ),
+            (
+                "The ACLED signal should not be interpreted as evidence of terrorism "
+                "financing, criminality, sanctions exposure, or illicit activity. It is "
+                "a public-source context signal that can help analysts decide whether "
+                "recent instability conditions warrant refreshed review."
+            ),
+        ],
+    )
+
+    if acled_df is None or acled_df.empty:
+        doc.add_paragraph("ACLED signal enrichment output was not available.")
+        return
+
+    country_count = len(acled_df)
+
+    total_events = (
+        int(pd.to_numeric(acled_df["acled_event_count"], errors="coerce").fillna(0).sum())
+        if "acled_event_count" in acled_df.columns
+        else 0
+    )
+
+    total_fatalities = (
+        int(pd.to_numeric(acled_df["acled_fatalities"], errors="coerce").fillna(0).sum())
+        if "acled_fatalities" in acled_df.columns
+        else 0
+    )
+
+    high_or_severe_count = 0
+    if "acled_signal_level" in acled_df.columns:
+        high_or_severe_count = int(
+            acled_df["acled_signal_level"].isin(["High", "Severe"]).sum()
+        )
+
+    doc.add_paragraph(
+        f"The ACLED enrichment output contains {country_count:,} country or territory "
+        f"records, {total_events:,} recent event records after aggregation, and "
+        f"{total_fatalities:,} recorded fatalities in the configured lookback window. "
+        f"{high_or_severe_count:,} records are classified as High or Severe in the "
+        f"ACLED signal layer."
+    )
+
+    doc.add_heading("Top ACLED Recent Conflict and Unrest Signals", level=2)
+
+    display_df = prepare_acled_signal_table(acled_df)
+
+    add_dataframe_table(
+        doc,
+        display_df,
+        [
+            "Country",
+            "ISO / Code",
+            "Events",
+            "Fatalities",
+            "Political Violence",
+            "Unrest",
+            "ACLED Signal",
+            "Signal Level",
+        ],
+        [
+            "Country",
+            "ISO / Code",
+            "Events",
+            "Fatalities",
+            "Political Violence",
+            "Unrest",
+            "ACLED Signal",
+            "Signal Level",
+        ],
+        max_rows=MAX_ACLED_SIGNAL_ROWS,
+    )
+
+    doc.add_paragraph(
+        "Countries or territories appearing in this table should be treated as "
+        "recent instability review candidates only. They are not being identified "
+        "as terrorism-financing jurisdictions or threat actors."
+    )
+
+
+def add_organized_crime_supplement(
+    doc: Document,
+    organized_crime_df: pd.DataFrame | None,
+) -> None:
+    """
+    Add Global Organized Crime Index supplemental context section.
+    """
+
+    doc.add_heading("Global Organized Crime Index Supplement", level=1)
+
+    add_paragraphs(
+        doc,
+        [
+            (
+                "This supplemental section adds country-level organized-crime exposure "
+                "and resilience context using the Global Organized Crime Index. The "
+                "organized-crime layer is used as convergence context for the "
+                "threat-finance intelligence and collection-priority workflow."
+            ),
+            (
+                "The organized-crime score does not replace the baseline terrorism-"
+                "financing vulnerability score. It should not be interpreted as evidence "
+                "of terrorism financing, criminality, sanctions exposure, illicit finance, "
+                "or activity by any specific person, entity, account, wallet, or network."
+            ),
+        ],
+    )
+
+    if organized_crime_df is None or organized_crime_df.empty:
+        doc.add_paragraph("Organized-crime enrichment output was not available.")
+        return
+
+    record_count = len(organized_crime_df)
+
+    matched_count = (
+        int(
+            pd.to_numeric(
+                organized_crime_df["organized_crime_source_present"],
+                errors="coerce",
+            )
+            .fillna(0)
+            .sum()
+        )
+        if "organized_crime_source_present" in organized_crime_df.columns
+        else int(organized_crime_df["organized_crime_score"].notna().sum())
+        if "organized_crime_score" in organized_crime_df.columns
+        else 0
+    )
+
+    avg_score = (
+        organized_crime_df["organized_crime_score"].mean()
+        if "organized_crime_score" in organized_crime_df.columns
+        else None
+    )
+
+    high_or_above_count = 0
+    if "organized_crime_level" in organized_crime_df.columns:
+        high_or_above_count = int(
+            organized_crime_df["organized_crime_level"].isin(
+                ["High", "Very High"]
+            ).sum()
+        )
+
+    latest_year = "N/A"
+    if (
+        "oc_index_year" in organized_crime_df.columns
+        and organized_crime_df["oc_index_year"].notna().any()
+    ):
+        latest_year = safe_year(organized_crime_df["oc_index_year"].max())
+
+    doc.add_paragraph(
+        f"The organized-crime enrichment output contains {record_count:,} modeled "
+        f"country records, with {matched_count:,} records matched to the Global "
+        f"Organized Crime Index. The latest index year represented is {latest_year}. "
+        f"The average organized-crime vulnerability score is {safe_number(avg_score, 2)}, "
+        f"and {high_or_above_count:,} records are classified as High or Very High."
+    )
+
+    doc.add_heading("Top Organized-Crime Vulnerability Scores", level=2)
+
+    display_df = prepare_organized_crime_table(organized_crime_df)
+
+    add_dataframe_table(
+        doc,
+        display_df,
+        [
+            "Country",
+            "ISO3",
+            "Index Year",
+            "Criminality",
+            "Resilience",
+            "Exposure",
+            "Resilience Gap",
+            "OC Vulnerability",
+            "OC Level",
+        ],
+        [
+            "Country",
+            "ISO3",
+            "Index Year",
+            "Criminality",
+            "Resilience",
+            "Exposure",
+            "Resilience Gap",
+            "OC Score",
+            "OC Level",
+        ],
+        max_rows=MAX_ORGANIZED_CRIME_ROWS,
+    )
+
+    doc.add_paragraph(
+        "Countries appearing in this table should be treated as organized-crime "
+        "context review candidates only. The table is useful for understanding "
+        "where illicit-market exposure and resilience gaps may overlap with "
+        "structural vulnerability, but it is not a terrorism-financing or "
+        "criminality determination."
+    )
+
+
+def add_gdelt_news_signal_supplement(
+    doc: Document,
+    gdelt_df: pd.DataFrame | None,
+) -> None:
+    """
+    Add GDELT 2.0 batch public-news signal supplemental context section.
+    """
+
+    doc.add_heading("GDELT 2.0 Batch Public-News Signal Supplement", level=1)
+
+    add_paragraphs(
+        doc,
+        [
+            (
+                "This supplemental section adds country-level public-news signal context "
+                "using locally filtered GDELT 2.0 Global Knowledge Graph batch files. "
+                "The GDELT layer is used as media-reporting and open-source signal "
+                "context for the threat-finance intelligence and collection-priority "
+                "workflow."
+            ),
+            (
+                "The GDELT signal does not replace the baseline terrorism-financing "
+                "vulnerability score. It should not be interpreted as evidence of terrorism "
+                "financing, criminality, sanctions exposure, illicit finance, or activity by "
+                "any specific person, entity, account, wallet, or network. Public reporting "
+                "can include duplication, media bias, translation artifacts, false positives, "
+                "and uneven country coverage."
+            ),
+            (
+                "This project uses GDELT 2.0 batch files rather than one country-by-country "
+                "DOC API query per modeled jurisdiction. The batch approach reduces "
+                "rate-limit exposure and supports repeatable local filtering."
+            ),
+        ],
+    )
+
+    if gdelt_df is None or gdelt_df.empty:
+        doc.add_paragraph("GDELT 2.0 batch news signal enrichment output was not available.")
+        return
+
+    record_count = len(gdelt_df)
+
+    matched_count = (
+        int((pd.to_numeric(gdelt_df["gdelt_source_present"], errors="coerce").fillna(0) == 1).sum())
+        if "gdelt_source_present" in gdelt_df.columns
+        else int((pd.to_numeric(gdelt_df["gdelt_matching_record_count"], errors="coerce").fillna(0) > 0).sum())
+        if "gdelt_matching_record_count" in gdelt_df.columns
+        else 0
+    )
+
+    total_records = (
+        pd.to_numeric(gdelt_df["gdelt_matching_record_count"], errors="coerce")
+        .fillna(0)
+        .sum()
+        if "gdelt_matching_record_count" in gdelt_df.columns
+        else pd.to_numeric(gdelt_df["gdelt_article_count"], errors="coerce")
+        .fillna(0)
+        .sum()
+        if "gdelt_article_count" in gdelt_df.columns
+        else 0
+    )
+
+    total_sources = (
+        pd.to_numeric(gdelt_df["gdelt_matching_source_count"], errors="coerce")
+        .fillna(0)
+        .sum()
+        if "gdelt_matching_source_count" in gdelt_df.columns
+        else 0
+    )
+
+    batch_file_count = "N/A"
+    if (
+        "gdelt_batch_file_count" in gdelt_df.columns
+        and gdelt_df["gdelt_batch_file_count"].notna().any()
+    ):
+        batch_file_count = safe_int(gdelt_df["gdelt_batch_file_count"].max())
+
+    avg_signal = (
+        gdelt_df["gdelt_news_signal_score"].mean()
+        if "gdelt_news_signal_score" in gdelt_df.columns
+        else None
+    )
+
+    high_or_above_count = 0
+    if "gdelt_news_signal_level" in gdelt_df.columns:
+        high_or_above_count = int(
+            gdelt_df["gdelt_news_signal_level"].isin(
+                ["High", "Very High"]
+            ).sum()
+        )
+
+    doc.add_paragraph(
+        f"The GDELT 2.0 batch enrichment output contains {record_count:,} modeled "
+        f"country records. {matched_count:,} countries have at least one matched "
+        f"GDELT signal record. The enrichment processed {batch_file_count} GDELT "
+        f"batch files, identified {safe_number(total_records, 0)} matched GKG "
+        f"country records, and counted {safe_number(total_sources, 0)} matched "
+        f"source references. The average GDELT signal score is "
+        f"{safe_number(avg_signal, 2)}, and {high_or_above_count:,} records are "
+        f"classified as High or Very High."
+    )
+
+    doc.add_heading("Top GDELT 2.0 Batch Public-News Signal Scores", level=2)
+
+    display_df = prepare_gdelt_signal_table(gdelt_df)
+
+    add_dataframe_table(
+        doc,
+        display_df,
+        [
+            "Country",
+            "ISO3",
+            "Batch Files",
+            "Matched Records",
+            "Matched Sources",
+            "Average Tone",
+            "GDELT Signal",
+            "Signal Level",
+            "Batch Status",
+        ],
+        [
+            "Country",
+            "ISO3",
+            "Files",
+            "Records",
+            "Sources",
+            "Avg. Tone",
+            "GDELT Signal",
+            "Signal Level",
+            "Status",
+        ],
+        max_rows=MAX_GDELT_SIGNAL_ROWS,
+    )
+
+    doc.add_paragraph(
+        "Countries appearing in this table should be treated as public-news review "
+        "candidates only. The table is useful for understanding where recent GDELT "
+        "media-reporting signals may justify refreshed public-source review, but it "
+        "is not a terrorism-financing, sanctions, or criminality determination."
+    )
 
 
 def add_current_data_supplement(
@@ -2115,8 +3004,9 @@ def add_charts(doc: Document) -> None:
     doc.add_paragraph(
         "The following charts summarize the main quantitative outputs from the model. "
         "They support interpretation of the country rankings, predicted FATF grey-list "
-        "probabilities, sensitivity analysis, conflict exposure, regional patterns, and "
-        "current FATF comparison layer."
+        "probabilities, sensitivity analysis, conflict exposure, regional patterns, "
+        "current FATF comparison, ACLED recent signals, and threat-finance collection "
+        "prioritization layers."
     )
 
     charts = [
@@ -2198,6 +3088,51 @@ def add_charts(doc: Document) -> None:
                 "This chart compares the model's FATF target coding with the current FATF increased-monitoring status "
                 "configured in the project. It helps show where the model-year target and current-status supplement align "
                 "or differ."
+            ),
+        ),
+        (
+            TOP_15_COLLECTION_PRIORITY_CHART_FILE,
+            "Figure 10. Top 15 Threat Finance Collection Priorities",
+            (
+                "This chart summarizes the countries with the highest collection-priority scores. The score combines "
+                "baseline vulnerability, live or recent signal strength, intelligence gaps, source staleness, and "
+                "decision relevance. It is a public-source review prioritization output, not a terrorism-financing finding."
+            ),
+        ),
+        (
+            INTELLIGENCE_GAP_DISTRIBUTION_CHART_FILE,
+            "Figure 11. Distribution of Threat Finance Intelligence Gap Scores",
+            (
+                "This chart shows how intelligence-gap scores are distributed across the modeled countries. Higher values "
+                "indicate more missing, stale, or weak source coverage and can help analysts identify where refreshed "
+                "public-source collection is most needed."
+            ),
+        ),
+        (
+            ACLED_SIGNAL_TOP_15_CHART_FILE,
+            "Figure 12. Top 15 ACLED Recent Conflict and Unrest Signals",
+            (
+                "This chart summarizes recent ACLED conflict, unrest, and political-violence signals. It supports the "
+                "live-signal layer and collection-priority workflow, but it does not identify terrorism financing or "
+                "criminal activity."
+            ),
+        ),
+        (
+            TOP_15_ORGANIZED_CRIME_CHART_FILE,
+            "Figure 13. Top 15 Organized Crime Vulnerability Scores",
+            (
+                "This chart summarizes supplemental Global Organized Crime Index enrichment. It highlights where "
+                "organized-crime exposure and resilience gaps may provide useful convergence context for analyst review. "
+                "It is not evidence of terrorism financing, criminality, sanctions exposure, or illicit activity."
+            ),
+        ),
+        (
+            TOP_15_GDELT_NEWS_SIGNAL_CHART_FILE,
+            "Figure 14. Top 15 GDELT 2.0 Batch Public-News Signal Scores",
+            (
+                "This chart summarizes supplemental GDELT 2.0 batch public-news signal enrichment. It highlights where recent "
+                "media-reporting volume may support refreshed public-source review. It is not evidence of terrorism "
+                "financing, criminality, sanctions exposure, or illicit activity."
             ),
         ),
     ]
@@ -2401,6 +3336,15 @@ def build_report() -> Document:
     summary_df = read_csv_if_exists(ADDITIONAL_RISK_FACTOR_SUMMARY_FILE)
     sanctions_df = read_csv_if_exists(SANCTIONS_EXPOSURE_SUPPLEMENT_FILE)
     mutual_eval_df = read_csv_if_exists(FATF_MUTUAL_EVALUATION_SUPPLEMENT_FILE)
+    collection_priority_df = read_csv_if_exists(
+        THREAT_FINANCE_COLLECTION_PRIORITIES_FILE
+    )
+    source_register_df = read_csv_if_exists(
+        THREAT_FINANCE_SOURCE_REGISTER_FILE
+    )
+    acled_signal_df = read_csv_if_exists(ACLED_SIGNAL_ENRICHMENT_FILE)
+    organized_crime_df = read_csv_if_exists(ORGANIZED_CRIME_ENRICHMENT_FILE)
+    gdelt_news_df = read_csv_if_exists(GDELT_NEWS_SIGNAL_ENRICHMENT_FILE)
     logit_text = read_text_if_exists(LOGIT_SUMMARY_FILE)
 
     doc = Document()
@@ -2430,6 +3374,14 @@ def build_report() -> Document:
         sanctions_df,
         mutual_eval_df,
     )
+    add_threat_finance_intelligence_gap_analysis(
+        doc,
+        collection_priority_df,
+        source_register_df,
+    )
+    add_acled_signal_supplement(doc, acled_signal_df)
+    add_organized_crime_supplement(doc, organized_crime_df)
+    add_gdelt_news_signal_supplement(doc, gdelt_news_df)
     add_current_data_supplement(doc, current_df, current_fatf_df)
     add_official_designation_context(doc)
     add_south_africa_fic_context(doc)

@@ -3,8 +3,9 @@ Configuration file for the terrorism financing OSINT risk model.
 
 This file stores project-wide settings, data paths, World Bank indicators,
 risk model weights, FATF grey-list countries, current FATF monitoring context,
-conflict-data supplement settings, additional risk factor settings,
-and output file locations.
+conflict-data supplement settings, ACLED signal-enrichment settings,
+Global Organized Crime Index settings, GDELT 2.0 batch public-news signal
+settings, additional risk factor settings, and output file locations.
 """
 
 from pathlib import Path
@@ -329,12 +330,181 @@ UCDP_ORGANIZED_VIOLENCE_URL = (
 
 
 # ---------------------------------------------------
+# ACLED conflict and political-violence signal settings
+# ---------------------------------------------------
+# ACLED is used as a supplemental near-real-time conflict, unrest, and
+# political-violence signal layer. It does not replace the main
+# terrorism-financing vulnerability score and is not evidence of
+# terrorism-financing activity.
+#
+# Credentials should be stored in a local .env file and should not be committed:
+# ACLED_USERNAME=your_myacled_email_here
+# ACLED_PASSWORD=your_myacled_password_here
+
+ACLED_START_YEAR = 2024
+ACLED_END_YEAR = 2026
+ACLED_LOOKBACK_DAYS = 180
+
+# Backward-compatible aliases for older ACLED collection code.
+START_YEAR = ACLED_START_YEAR
+END_YEAR = ACLED_END_YEAR
+
+ACLED_API_BASE_URL = "https://acleddata.com/api/acled/read"
+ACLED_OAUTH_URL = "https://acleddata.com/oauth/token"
+
+ACLED_API_LIMIT = 5000
+
+ACLED_API_FIELDS = [
+    "event_id_cnty",
+    "event_date",
+    "year",
+    "country",
+    "iso",
+    "event_type",
+    "sub_event_type",
+    "actor1",
+    "actor2",
+    "admin1",
+    "admin2",
+    "location",
+    "latitude",
+    "longitude",
+    "fatalities",
+]
+
+ACLED_EVENT_TYPES = [
+    "Battles",
+    "Explosions/Remote violence",
+    "Violence against civilians",
+    "Protests",
+    "Riots",
+    "Strategic developments",
+]
+
+
+# ---------------------------------------------------
+# Global Organized Crime Index settings
+# ---------------------------------------------------
+# The Global Organized Crime Index is used as a supplemental country-level
+# organized-crime exposure and resilience context layer. It does not replace
+# the main terrorism-financing vulnerability score and is not evidence of
+# terrorism-financing activity, criminality, sanctions exposure, or illicit
+# activity.
+#
+# The workbook is downloaded or reused by src.organized_crime_enrichment.
+# TARGET_OC_INDEX_YEAR can be set to a specific year such as 2025. If it is
+# None, the enrichment module selects the latest available index year.
+
+GLOBAL_ORGANIZED_CRIME_INDEX_URL = (
+    "https://ocindex.net/assets/downloads/global_oc_index.xlsx"
+)
+
+TARGET_OC_INDEX_YEAR = None
+
+
+# ---------------------------------------------------
+# GDELT 2.0 batch public-news signal settings
+# ---------------------------------------------------
+# GDELT is used as a supplemental open-source public-news signal layer.
+# It does not replace the main terrorism-financing vulnerability score and is
+# not evidence of terrorism-financing activity, criminality, sanctions exposure,
+# illicit finance, or activity by any specific person, entity, account, wallet,
+# or network.
+#
+# This project uses GDELT 2.0 batch GKG files rather than sending one DOC API
+# request per country. This reduces rate-limit issues and supports repeatable
+# local filtering.
+
+GDELT_MASTER_FILE_LIST_URL = (
+    "http://data.gdeltproject.org/gdeltv2/masterfilelist.txt"
+)
+
+# Number of most-recent GDELT GKG files to process. GDELT 2.0 publishes
+# frequent updates, so 24 files gives a compact near-real-time sample while
+# keeping the pipeline manageable.
+GDELT_BATCH_MAX_FILES = 24
+
+# Small pause between GDELT batch file downloads.
+GDELT_BATCH_SLEEP_SECONDS = 0.5
+
+# Request timeout for master file list and GKG ZIP downloads.
+GDELT_BATCH_TIMEOUT_SECONDS = 60
+
+# Reuse downloaded GKG ZIP files in data/raw/gdelt_gkg/ when available.
+GDELT_BATCH_REUSE_RAW_FILES = True
+
+# Local cache folder for downloaded GDELT GKG ZIP files.
+GDELT_BATCH_RAW_DIR = RAW_DATA_DIR / "gdelt_gkg"
+
+GDELT_BATCH_KEYWORDS = [
+    "terrorist financing",
+    "terrorism financing",
+    "terror finance",
+    "threat finance",
+    "illicit finance",
+    "money laundering",
+    "aml",
+    "cft",
+    "countering the financing of terrorism",
+    "counter terrorist financing",
+    "sanctions",
+    "financial crime",
+    "hawala",
+    "charity abuse",
+    "front company",
+    "beneficial ownership",
+    "crypto sanctions",
+    "virtual asset",
+]
+
+
+# ---------------------------------------------------
 # Conflict data supplement outputs
 # ---------------------------------------------------
 
 UCDP_CONFLICT_RAW_FILE = RAW_DATA_DIR / "ucdp_conflict_country_year_raw.csv"
 CONFLICT_DATA_SUPPLEMENT_FILE = TABLES_DIR / "conflict_data_supplement.csv"
 TOP_RISK_DRIVERS_FILE = TABLES_DIR / "top_risk_drivers.csv"
+
+
+# ---------------------------------------------------
+# ACLED conflict and political-violence signal outputs
+# ---------------------------------------------------
+
+ACLED_RAW_FILE = RAW_DATA_DIR / "acled_events.csv"
+ACLED_CHECKPOINT_FILE = RAW_DATA_DIR / "acled_events_checkpoint.csv"
+ACLED_SIGNAL_ENRICHMENT_FILE = TABLES_DIR / "acled_signal_enrichment.csv"
+
+
+# ---------------------------------------------------
+# Global Organized Crime Index outputs
+# ---------------------------------------------------
+
+GLOBAL_ORGANIZED_CRIME_INDEX_RAW_FILE = RAW_DATA_DIR / "global_oc_index.xlsx"
+
+ORGANIZED_CRIME_ENRICHMENT_FILE = (
+    TABLES_DIR / "organized_crime_enrichment.csv"
+)
+
+
+# ---------------------------------------------------
+# GDELT 2.0 batch public-news signal outputs
+# ---------------------------------------------------
+
+GDELT_NEWS_SIGNAL_ENRICHMENT_FILE = (
+    TABLES_DIR / "gdelt_news_signal_enrichment.csv"
+)
+
+
+# ---------------------------------------------------
+# Threat finance intelligence gap outputs
+# ---------------------------------------------------
+
+THREAT_FINANCE_COLLECTION_PRIORITIES_FILE = (
+    TABLES_DIR / "threat_finance_collection_priorities.csv"
+)
+
+THREAT_FINANCE_SOURCE_REGISTER_FILE = TABLES_DIR / "source_register.csv"
 
 
 # ---------------------------------------------------
@@ -395,6 +565,26 @@ REGIONAL_FATF_COUNT_CHART_FILE = CHARTS_DIR / "regional_fatf_count.png"
 
 CURRENT_FATF_STATUS_COMPARISON_CHART_FILE = (
     CHARTS_DIR / "current_fatf_status_comparison.png"
+)
+
+TOP_15_COLLECTION_PRIORITY_CHART_FILE = (
+    CHARTS_DIR / "top_15_collection_priority_scores.png"
+)
+
+INTELLIGENCE_GAP_DISTRIBUTION_CHART_FILE = (
+    CHARTS_DIR / "intelligence_gap_distribution.png"
+)
+
+ACLED_SIGNAL_TOP_15_CHART_FILE = (
+    CHARTS_DIR / "top_15_acled_conflict_signal_scores.png"
+)
+
+TOP_15_ORGANIZED_CRIME_CHART_FILE = (
+    CHARTS_DIR / "top_15_organized_crime_vulnerability_scores.png"
+)
+
+TOP_15_GDELT_NEWS_SIGNAL_CHART_FILE = (
+    CHARTS_DIR / "top_15_gdelt_news_signal_scores.png"
 )
 
 
@@ -513,9 +703,60 @@ def validate_config() -> None:
                 f"Current total: {scenario_total}"
             )
 
+    if ACLED_START_YEAR < 1997:
+        raise ValueError("ACLED_START_YEAR appears invalid.")
+
+    if ACLED_END_YEAR < ACLED_START_YEAR:
+        raise ValueError(
+            "ACLED_END_YEAR must be greater than or equal to ACLED_START_YEAR."
+        )
+
+    if ACLED_LOOKBACK_DAYS <= 0:
+        raise ValueError("ACLED_LOOKBACK_DAYS must be greater than zero.")
+
+    if not ACLED_API_BASE_URL:
+        raise ValueError("ACLED_API_BASE_URL cannot be empty.")
+
+    if not ACLED_OAUTH_URL:
+        raise ValueError("ACLED_OAUTH_URL cannot be empty.")
+
+    if ACLED_API_LIMIT <= 0:
+        raise ValueError("ACLED_API_LIMIT must be greater than zero.")
+
+    if not ACLED_API_FIELDS:
+        raise ValueError("ACLED_API_FIELDS cannot be empty.")
+
+    if not ACLED_EVENT_TYPES:
+        raise ValueError("ACLED_EVENT_TYPES cannot be empty.")
+
+    if not GLOBAL_ORGANIZED_CRIME_INDEX_URL:
+        raise ValueError("GLOBAL_ORGANIZED_CRIME_INDEX_URL cannot be empty.")
+
+    if TARGET_OC_INDEX_YEAR is not None and not isinstance(TARGET_OC_INDEX_YEAR, int):
+        raise TypeError("TARGET_OC_INDEX_YEAR must be an integer or None.")
+
+    if not GDELT_MASTER_FILE_LIST_URL:
+        raise ValueError("GDELT_MASTER_FILE_LIST_URL cannot be empty.")
+
+    if GDELT_BATCH_MAX_FILES <= 0:
+        raise ValueError("GDELT_BATCH_MAX_FILES must be greater than zero.")
+
+    if GDELT_BATCH_SLEEP_SECONDS < 0:
+        raise ValueError("GDELT_BATCH_SLEEP_SECONDS cannot be negative.")
+
+    if GDELT_BATCH_TIMEOUT_SECONDS <= 0:
+        raise ValueError("GDELT_BATCH_TIMEOUT_SECONDS must be greater than zero.")
+
+    if not isinstance(GDELT_BATCH_REUSE_RAW_FILES, bool):
+        raise TypeError("GDELT_BATCH_REUSE_RAW_FILES must be a boolean.")
+
+    if not GDELT_BATCH_KEYWORDS:
+        raise ValueError("GDELT_BATCH_KEYWORDS cannot be empty.")
+
     required_directories = [
         DATA_DIR,
         RAW_DATA_DIR,
+        GDELT_BATCH_RAW_DIR,
         PROCESSED_DATA_DIR,
         OUTPUTS_DIR,
         CHARTS_DIR,
@@ -534,6 +775,16 @@ def validate_config() -> None:
         CORRELATION_MATRIX_FILE,
         WORD_REPORT_FILE,
         PDF_REPORT_FILE,
+        ACLED_RAW_FILE,
+        ACLED_CHECKPOINT_FILE,
+        ACLED_SIGNAL_ENRICHMENT_FILE,
+        GLOBAL_ORGANIZED_CRIME_INDEX_RAW_FILE,
+        ORGANIZED_CRIME_ENRICHMENT_FILE,
+        TOP_15_ORGANIZED_CRIME_CHART_FILE,
+        GDELT_NEWS_SIGNAL_ENRICHMENT_FILE,
+        TOP_15_GDELT_NEWS_SIGNAL_CHART_FILE,
+        THREAT_FINANCE_COLLECTION_PRIORITIES_FILE,
+        THREAT_FINANCE_SOURCE_REGISTER_FILE,
     ]
 
     for file_path in required_files:
